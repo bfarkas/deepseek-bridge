@@ -21,13 +21,13 @@ max_timeout_seconds = 3600
 # Dollar caps are estimates, not exact guarantees.
 estimated_cost_limit_usd = 2.0
 
-[sandbox]
-enabled = false # Enable only after M3 isolation/egress checks pass.
-cpus = 2
-memory_mib = 4096
-pids_limit = 256
-worker_model = "deepseek/deepseek-v4-pro"
-# A pinned image digest and enforced egress profile are required before enabling.
+[worker]
+backend = "host"
+executable = "opencode" # Resolve and validate the executable during setup.
+model = "deepseek/deepseek-v4-pro"
+worktree_root = "/absolute/path/to/private/worker-worktrees"
+# Run in the dedicated worktree with per-job config and an explicit environment.
+# Host account permissions/networking apply; no filesystem sandbox is implied.
 
 [research]
 mode = "automatic_with_approval"

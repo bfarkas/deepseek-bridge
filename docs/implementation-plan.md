@@ -10,10 +10,10 @@ Dependency chain: M0 → M1 → M2 → M3 → M4 → M5. Research policy/schema 
 
 ## M0 — Verify integration assumptions
 
-- Record Python, Claude Code, the container runtime, Git, OpenCode, SDK, and FastMCP versions in a compatibility matrix. Pin dependencies and worker image digest after a small compatibility spike.
+- Record Python, Claude Code, Git, OpenCode, SDK, host toolchains, and FastMCP versions in a compatibility matrix. Pin dependencies and the OpenCode executable version after a small compatibility spike.
 - Confirm DeepSeek endpoint/model/effort capabilities, response block preservation, token/cache reporting, and OpenCode headless event format. Use fake responses by default; make a minimal live call only during an explicitly enabled smoke test.
 - Verify local stdio MCP registration and actual hook payloads for installed Claude Code. Test persistence of the separate runner after an MCP disconnect.
-- Prove snapshot export, safe change collection, and container-runtime egress enforcement. If the selected runtime cannot enforce it, block worker enablement rather than falling back to host execution.
+- Verify host OpenCode execution in a dedicated worktree, local toolchain/dependency access, effective permission configuration, and process-group cancellation. Record that execution uses account permissions and has no bridge-enforced filesystem or network sandbox.
 
 Deliver `docs/compatibility.md`, sanitized event fixtures, and decisions for any failed assumptions. Acceptance: reproducible evidence exists for the chosen versions; live checks are clearly distinguished from mocks.
 
@@ -34,13 +34,13 @@ Acceptance: Claude reviews an explicitly selected diff and receives structured f
 
 Acceptance: a fake job survives MCP restart; runner restart marks interrupted work without blind reexecution. Two competing clients cannot claim the same job or exceed capacity. Test cancellation/completion races, migration rollback/recovery, missing artifacts, unknown prices, and orphan cleanup. A stopped runner produces queued jobs and an actionable `doctor` failure rather than spawning untracked processes.
 
-## M3 — Isolated coding worker MVP
+## M3 — Host coding worker MVP
 
-- Implement repository/base-SHA validation, branch/worktree lifecycle, snapshot export, safe delta collection, and deterministic patch artifacts, including new and deleted files.
-- Build a pinned OpenCode image and adapter for JSON events. Use a controlled environment/configuration, container-only execution, API relay, enforced egress, quotas, and no host credentials.
-- Add independent network-disabled verification and bridge-generated handoffs. Preserve partial output, failure evidence, and resource usage.
+- Implement repository/base-SHA validation, generated branches/dedicated worktrees, explicit dependency preparation, and deterministic patch artifacts including new, deleted, and binary files.
+- Implement a pinned host OpenCode subprocess adapter with JSON events, per-job configuration, environment allowlisting, scoped application permissions, deadlines, and bounded output. Use local files/toolchains directly; identify shared caches and local-service dependencies explicitly.
+- Add independently executed host verification and bridge-generated handoffs. Record tool versions, commands, exit status, partial output, and usage. Track worker and verification process groups with ownership information for cancellation and restart reconciliation.
 
-Acceptance: a fixture task changes code and adds tests entirely in the disposable workspace; the original checkout and its uncommitted changes are byte-for-byte unchanged. Claude receives a patch and independently observed test evidence. Container checks prove host home, shared Git metadata, Docker socket, SSH agent, and arbitrary internet endpoints are inaccessible; only the allowed relay works. Test timeouts, cancellation, stale refs, name collisions, malicious links/paths, oversized output, untracked/binary changes, and modified test scripts. No automatic merge, push, or deployment occurs.
+Acceptance: a fixture task edits code and adds tests in its dedicated worktree using the host toolchain; the original checkout and its uncommitted changes remain unchanged in the test. Claude receives the patch and independently observed verification evidence. Test working-directory selection, environment filtering, unexpected configuration, missing executable, local-file/dependency access, shared-resource contention, timeouts, cancellation and PID reuse, stale refs, name collisions, oversized output, new/binary files, and modified tests. No automatic merge, push, or deployment occurs. These checks validate intended behavior; they do not prove containment of a malicious host process.
 
 ## M4 — Passive security researcher and escalation
 
@@ -53,7 +53,7 @@ Acceptance: eligible technical blockers automatically enqueue passive research; 
 ## M5 — Operational release
 
 - Implement `doctor`, service-manager runner installation/removal, safe hook/settings merge instructions, redacted diagnostics, artifact export/delete, and recovery/runbooks.
-- Add CI for lint/types, contract and unit tests, fixture Git integration, fake provider/harness tests, and a Linux container suite. Document verification gates for each supported host platform and runtime; Linux CI alone does not prove enforcement on other platforms.
+- Add CI for lint/types, contract and unit tests, fixture Git integration, and fake provider/harness tests. Add host-worker smoke checks for each supported operating system; CI does not establish compatibility with every local toolchain or permission configuration.
 - Document budgets, data transmission, supported versions, review/integration workflow, and how to disable hooks/stop the runner while preserving artifacts.
 - Benchmark a small analysis task, isolated implementation, and passive investigation. Measure elapsed time, actual tokens/cost estimate, Claude review effort, and acceptance outcome.
 
@@ -65,7 +65,7 @@ Acceptance: another local installation can reproduce setup and rollback from doc
 2. M1 settings/contracts/context collector and mocked provider CLI.
 3. M1 MCP tools and one opt-in consultation smoke test.
 4. M2 persistence, runner, lifecycle and recovery.
-5. M3 isolation proof, then OpenCode integration and handoff.
+5. M3 host/worktree execution, process lifecycle, verification, and handoff.
 6. M4 trusted scopes/approval tests, then hooks and researcher.
 7. M5 installation, runbooks, compatibility evidence and benchmark.
 
@@ -73,4 +73,4 @@ Each slice should be independently reviewable. Introduce tests alongside behavio
 
 ## Unresolved decisions
 
-Choose exact dependency versions and effort mappings at M0. Validate the worker relay/network backend on the container runtime. Decide initial repositories, trusted research scopes, sensitive-data rules, and which operating-system credential-store integrations should complement environment variables. Select verification profiles and permitted dependency preparation per repository. Dollar thresholds and retention need deployment-specific tuning; defaults are proposals rather than measured requirements. Automatic quota-based handoff is outside the first release.
+Choose exact dependency versions and effort mappings at M0. Validate host process management and the selected OpenCode permission/configuration behavior. Decide initial repositories, trusted research scopes, sensitive-data rules, and which operating-system credential-store integrations should complement environment variables. Select verification profiles and permitted dependency preparation per repository. Dollar thresholds and retention need deployment-specific tuning; defaults are proposals rather than measured requirements. Automatic quota-based handoff is outside the first release.

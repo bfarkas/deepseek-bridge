@@ -15,6 +15,6 @@ These references inform the design; integrations have not been exercised by this
 
 ## Open engineering decisions
 
-The supervised runner, transactional job leases, snapshot/collect boundary, credential-holding relay, trusted scope registry, and approval hash binding are proposed mechanisms. Their exact interfaces and platform support remain subject to the implementation milestones.
+The supervised runner, transactional job leases, host process ownership checks, dedicated worktrees, trusted scope registry, and approval hash binding are proposed mechanisms. Their exact interfaces and platform support remain subject to the implementation milestones.
 
-Validate container networking and isolation on each supported host platform. Select dependency versions, verification profiles, credential-store integrations, data-retention rules, and resource budgets through explicit compatibility checks. Numeric defaults are proposals, not measured resource requirements.
+Validate host-worker process management, local toolchain access, and effective OpenCode permissions on each supported host platform. Select dependency versions, verification profiles, credential-store integrations, data-retention rules, and resource budgets through explicit compatibility checks. Numeric defaults are proposals, not measured resource requirements.

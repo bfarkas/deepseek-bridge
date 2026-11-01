@@ -7,7 +7,7 @@ Status: proposed design. Component boundaries and enforcement mechanisms require
 | Role | Inputs | Authority | Output |
 | --- | --- | --- | --- |
 | Consultant | Task, selected files/diff, optional conversation ID | Text inference only | Recommendations, alternatives, risks |
-| Coding worker | Immutable base commit, task, acceptance criteria | Edit a disposable sandbox workspace and run bounded commands | Patch, verification evidence, handoff |
+| Coding worker | Immutable base commit, task, acceptance criteria | Edit a dedicated host worktree and run local commands | Patch, verification evidence, handoff |
 | Security researcher | Scoped brief, approved evidence, research state | Passive text analysis only in v1 | Findings, evidence references, hypotheses, next steps |
 
 Claude reviews all external findings and owns integration. Research does not provide shell tools, browse autonomously, scan hosts, execute exploits, or modify a target. Without a retrieval tool, references returned by a model remain unverified until checked independently.
@@ -25,15 +25,16 @@ flowchart TD
     Core --> Queue[Persistent local job queue]
     Runner[Separate local runner process] --> Queue
     Runner --> API
-    Runner --> Sandbox[Container: OpenCode]
-    Sandbox --> Relay[Restricted credential-holding API relay]
-    Relay --> DeepSeek[DeepSeek cloud]
+    Runner --> Worker[Host OpenCode: dedicated Git worktree]
+    Worker --> DeepSeek[DeepSeek cloud]
     API --> DeepSeek
     Runner --> Artifacts[Private local artifacts]
     Artifacts --> MCP
 ```
 
-The credential relay is a narrow worker-isolation component. It accepts only the job's allowed DeepSeek API operations, enforces limits, and strips credentials from logs. The consultant can call DeepSeek directly. Container runtime, host bridge, and owner account are trusted; repository code, model output, and worker processes are untrusted.
+OpenCode runs directly on the host under the account that starts the runner and calls DeepSeek directly. Each job has its own Git worktree, working directory, process group, configuration, and logs. Local toolchains, dependency caches, and explicitly selected local services remain available without copying source into another execution environment.
+
+Worktrees provide change separation, not a filesystem or security sandbox. Host operating-system protections still apply, but the worker can access files and shared Git metadata available to its account. OpenCode permissions and controlled configuration guide execution; they do not establish an OS-enforced boundary. Use this backend for trusted repositories and tasks. The bridge's context allowlist governs its own API requests; it cannot guarantee that a host coding process reads or transmits only those files.
 
 ## Processes and modules
 
@@ -43,18 +44,18 @@ A separately managed runner claims queued jobs with transactional leases and hea
 
 Use the Anthropic Python SDK against DeepSeek's compatible endpoint for consultant/research requests. Preserve complete provider message blocks when continuing conversations. Validate model and effort capabilities, enforce explicit input/output limits, and bound transient-error retries by the request deadline. Do not silently downgrade unsupported parameters or retry an uncertain charge without recording the ambiguity. Keep provider and OpenCode adapters replaceable.
 
-## Coding job lifecycle and isolation
+## Coding job lifecycle on the host
 
-1. Resolve a configured repository alias, enforce task/size limits, and resolve the base ref to an immutable commit. Never import unstaged changes implicitly. Store the request and reserve capacity transactionally.
-2. Create a bridge-owned branch/worktree from that commit using argument arrays, generated names, and disabled Git hooks. Do not run repository scripts on the host.
-3. Export a clean source snapshot to a disposable container workspace. **Do not mount the host worktree or its `.git` file/common Git directory into the worker.** Linked worktrees otherwise expose or depend on shared host Git metadata. This snapshot-and-collect boundary preserves host worktree management while isolating untrusted execution.
-4. Start pinned OpenCode in a non-root container with a read-only root filesystem, writable job workspace and bounded temporary storage, dropped capabilities, no privilege escalation, and CPU/RAM/process/time/output limits. No home directory, SSH agent, cloud credentials, Docker socket, or host Git configuration is mounted. Disable inherited OpenCode plugins, MCP servers, auto-updates, and user configuration; inspect the effective configuration for repository overrides.
-5. Permit network only to the job API relay through an enforced network boundary. No direct internet route or DNS-only allowlist. Prebuild approved dependencies; dependency downloads need an explicit policy exception. Verify this on every supported container runtime before enabling workers.
-6. Stop the agent and freeze its output before collection. Collect changed/new/deleted files with quotas and path/symlink checks, including untracked files; reject special files and submodule changes initially. Apply the validated delta to the bridge-owned host worktree without executing repository hooks. Keep task instructions and bridge metadata outside the source snapshot.
-7. Run configured verification in a fresh network-disabled container. Test commands come from trusted project configuration, never arbitrary model-provided shell strings. Capture command, image digest, exit code, bounded logs, base commit, and output hash. A test can still be inadequate or modified by the worker; Claude must inspect the patch and test quality.
-8. Generate the diff, changed-file list, and handoff independently. Preserve failed/partial output for review. An optional bridge-owned commit is permitted after collection; workers cannot merge, push, or deploy. Default delivery is a patch.
+1. Resolve a configured repository alias and immutable base commit, validate the task and limits, and persist the request. Never import uncommitted changes implicitly.
+2. Create a bridge-owned branch and dedicated worktree using generated names and argument arrays. Disable Git hooks for bridge-managed Git commands. Preserve the original checkout and keep task instructions/logs outside the tracked source tree.
+3. Launch a pinned OpenCode executable directly in that worktree as a separate process group. Use an explicit environment allowlist, the required DeepSeek credential, per-job configuration, and bounded JSON event capture. Do not forward unrelated credential variables or agent sockets. This reduces accidental inheritance; it does not make other account-readable credentials inaccessible.
+4. Configure OpenCode's read/edit/command permissions for the scoped task and disable unattended permission prompts. Inspect effective configuration, including repository rules, plugins, and MCP servers; reject unapproved configuration extensions before starting. No automatic push, merge, deploy, or privileged command is authorized. These are application-level controls, not protection against arbitrary code running with account permissions.
+5. Use the host toolchain and approved dependency/test profiles. Document any worktree-specific dependency setup and explicitly selected shared caches, files, or local services. Store generated dependency/build files in the job worktree where possible; record shared resources that may cause contention. Do not create implicit symlinks into the original checkout. Network access follows host configuration; no bridge-enforced egress restriction is claimed.
+6. Stop OpenCode before verification and inspect the worktree against the recorded base. Independently collect tracked changes, new/deleted files, file modes, binary changes, and unexpected symlinks/submodules. Keep output quotas and validate artifact paths. Do not execute model-provided collection commands.
+7. Run trusted verification command argv on the host in the job worktree as a separately tracked process group. Record executable/tool versions, environment profile, working directory, timestamps, exit code, bounded logs, and output hash. Model-supplied test claims are not verification evidence. Inspect altered tests and check that the original checkout's recorded status/content is unchanged; this detects changes in the verification fixture but is not an access-control guarantee.
+8. Generate the patch, changed-file list, and handoff independently, including new files and partial output on failure. Default delivery is a patch. An optional bridge-owned commit can be made after verification with hooks disabled; integration remains a separate review action.
 
-Resource proposals: one worker by default, configurable up to three; 1,800-second default timeout, 3,600-second maximum; two CPUs and 4 GiB RAM initially. Benchmark rather than assume these are sufficient.
+Default limits: one worker, configurable up to three; 1,800-second default timeout and 3,600-second maximum; bounded logs/artifacts and model-token budgets. Host CPU and RAM are shared; no container-style hard CPU/RAM quotas are promised. Jobs sharing local services or caches require scheduling constraints or repository-specific coordination.
 
 ## Persistence, recovery, and artifacts
 
@@ -73,7 +74,7 @@ Store runtime data outside repositories in a private owner-only application stat
 
 Use atomic conditional state updates and a unique deduplication constraint. Publish artifacts through temporary files and atomic rename before referencing them in a final result. Artifacts include `handoff.json`, `summary.md`, `changes.patch` for coding jobs, `test-results.json`, and redacted `events.jsonl`.
 
-On restart reconcile leases with bridge-labelled containers. Stop orphaned execution before marking a job `interrupted`; require an explicit retry creating a new attempt. Never blindly rerun a potentially billable request or unfinished coding job. Cancellation first persists intent, then terminates the owned container/process group, waits, and escalates to kill after a grace period. Completion and cancellation race through one transactional terminal-state winner.
+On restart reconcile leases with recorded worker/verification process identities, start times, and job ownership. Do not kill a process based only on a reused PID; mark uncertain ownership for manual recovery. Stop execution whose ownership is verified before marking a job `interrupted`; require an explicit retry creating a new attempt. Never blindly rerun a potentially billable request or unfinished coding job. Cancellation first persists intent, then terminates the verified job process group, waits, and escalates to kill after a grace period. Completion and cancellation race through one transactional terminal-state winner.
 
 Use `null` for unavailable usage, test counts, or cost. Store original usage separately from derived estimates. Prices are versioned inputs; missing prices mean unknown cost. Token/time limits and pre-request reservations reduce spending, but a dollar estimate is not an exact hard cap, particularly during in-flight requests. Preserve whether Claude accepted/rejected a patch as explicit review metadata.
 

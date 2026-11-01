@@ -1,3 +1,3 @@
 # tests/unit
 
-Planned offline contract, context, provider, accounting, lifecycle, and policy tests. No paid APIs or Docker required.
+Planned offline contract, context, provider, accounting, lifecycle, and policy tests. No paid APIs or installed OpenCode executable required.

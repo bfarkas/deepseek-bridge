@@ -14,7 +14,7 @@ claude mcp add --scope user --transport stdio deepseek-bridge -- /absolute/path/
 deepseek-bridge doctor
 ```
 
-Check `/mcp` inside Claude. Start the separately installed runner through the configured service manager before asynchronous jobs; `doctor` reports runner health, schema/config validity, API credential presence, model compatibility, and sandbox availability without printing keys. It must not make paid calls unless explicitly requested.
+Check `/mcp` inside Claude. Start the separately installed runner through the configured service manager before asynchronous jobs; `doctor` reports runner health, schema/config validity, API credential presence, model compatibility, and host OpenCode/toolchain availability without printing keys. It must not make paid calls unless explicitly requested.
 
 ## Delegation instructions
 
@@ -35,3 +35,9 @@ Validate `/hooks`, capture a sanitized event fixture, and exercise a controlled 
 For coding jobs, inspect `changes.patch`, altered tests, base SHA, verification command/exit status, and unresolved issues. Integrate separately through the owner's normal merge/cherry-pick workflow. If the destination advanced, handle conflicts explicitly and rerun relevant verification. Preserve worktrees until review, then use bridge cleanup; never remove arbitrary paths or force-reset the user's checkout.
 
 When the provider fails, show a sanitized retryable error and usage uncertainty. When the runner stops, preserve queued jobs and reconcile interrupted execution before retrying. Disable only bridge hook entries, unregister only this MCP server, and stop/remove only its runner service to uninstall. Keep or explicitly delete private state/artifacts according to the owner's choice. No global settings or repository deletion is implied.
+
+## Host worker execution
+
+The runner launches OpenCode directly in a dedicated Git worktree. Configure approved dependency preparation, verification commands, and any required local file/cache/service access for each repository. Source changes are reviewed in that worktree and returned as a patch; the original checkout is not the worker's working directory.
+
+Execution uses the runner account's permissions and host networking. A worktree does not restrict access to other account-readable files or shared Git metadata. Use trusted repositories/tasks, inspect effective OpenCode configuration, and avoid concurrent jobs that conflict through shared local services. Cancellation covers verified job process groups; deliberately detached processes may need manual recovery.

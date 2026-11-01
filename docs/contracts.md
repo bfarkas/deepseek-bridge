@@ -31,7 +31,7 @@ Common result envelope:
 }
 ```
 
-Errors carry `code`, sanitized `message`, `retryable`, and optional `job_id`. Codes include `invalid_request`, `out_of_scope`, `approval_required`, `permission_boundary`, `budget_exceeded`, `provider_timeout`, `provider_error`, `sandbox_unavailable`, and `interrupted`. A valid JSON response is not evidence of correct findings. Malformed model reports produce an explicit parse error or labelled raw-text artifact, never fabricated structured claims.
+Errors carry `code`, sanitized `message`, `retryable`, and optional `job_id`. Codes include `invalid_request`, `out_of_scope`, `approval_required`, `permission_boundary`, `budget_exceeded`, `provider_timeout`, `provider_error`, `worker_unavailable`, and `interrupted`. A valid JSON response is not evidence of correct findings. Malformed model reports produce an explicit parse error or labelled raw-text artifact, never fabricated structured claims.
 
 ## Job state machine
 
@@ -59,7 +59,7 @@ Every nonterminal execution state can also become `failed`, `timed_out`, or `int
 
 Required report fields: schema version, job ID, role, status, task/request hash, actual model ID, summary, findings or changed files, risks, unresolved questions, usage, and artifact descriptors. Coding reports additionally require repository alias, immutable base SHA, optional result SHA, patch checksum, and verification evidence. Findings distinguish `verified`, `model_inference`, and `unverified_reference`.
 
-Each verification entry records trusted command argv, workspace output hash, container image digest, start/end time, exit code, log artifact, and optional parsed test counts. Zero tests and unknown counts differ. Preserve failures and timeouts. A summary supplied by the worker is labelled as such; the bridge computes file lists/diffs and observes verification exit statuses itself.
+Each verification entry records trusted command argv, working directory, workspace output hash, executable/tool versions, environment profile, start/end time, exit code, log artifact, and optional parsed test counts. Zero tests and unknown counts differ. Preserve failures and timeouts. A summary supplied by the worker is labelled as such; the bridge computes file lists/diffs and observes verification exit statuses itself.
 
 ## Security handoff envelope
 
