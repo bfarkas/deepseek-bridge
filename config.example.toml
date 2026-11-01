@@ -1,0 +1,46 @@
+# Proposed schema only; no configuration loader exists yet. No secrets here.
+[deepseek]
+base_url = "https://api.deepseek.com/anthropic"
+api_key_env = "DEEPSEEK_API_KEY"
+consultant_model = "deepseek-flash"
+review_model = "deepseek-v4-pro"
+research_model = "deepseek-v4-pro"
+# Effort mapping is capability-checked in M0, not assumed universal.
+
+[consultant]
+max_files = 20
+max_input_bytes = 200000
+max_output_tokens = 8000
+timeout_seconds = 120
+
+[jobs]
+max_concurrent = 1
+max_concurrent_limit = 3
+default_timeout_seconds = 1800
+max_timeout_seconds = 3600
+# Dollar caps are estimates, not exact guarantees.
+estimated_cost_limit_usd = 2.0
+
+[sandbox]
+enabled = false # Enable only after M3 isolation/egress checks pass.
+cpus = 2
+memory_mib = 4096
+pids_limit = 256
+worker_model = "deepseek/deepseek-v4-pro"
+# A pinned image digest and enforced egress profile are required before enabling.
+
+[research]
+mode = "automatic_with_approval"
+require_trusted_scope = true
+max_auto_escalations_per_task_revision = 1
+active_tools_enabled = false
+
+[storage]
+state_dir = "/absolute/path/to/private/bridge-state" # Set for the host platform.
+database_filename = "bridge.sqlite3"
+retention_days = 30
+
+[repositories.example-project]
+path = "/absolute/path/to/approved/repository"
+verification_profile = "approved-tests"
+# Owner-maintained research scopes live in private configuration outside this repo.
