@@ -1,6 +1,6 @@
 # Public references and implementation uncertainties
 
-Status: planning references only. No server, hook, or worker implementation is provided by this scaffold.
+Status: references used for implementation. The consultant/server, durable runner, gated host worker, and research policy now exist. See [compatibility](compatibility.md) for checked versions and the distinction between fixtures and live evidence.
 
 ## Official technical references
 

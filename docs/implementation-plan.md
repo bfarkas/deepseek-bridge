@@ -1,6 +1,17 @@
 # Implementation plan
 
-Status: proposed delivery backlog. This commit delivers documentation and a scaffold only. Milestones are ordered by dependencies, not calendar estimates; effort and dates remain unestimated.
+Status: implementation baseline delivered with offline validation; this document retains the original release acceptance backlog. Milestones are ordered by dependency, not calendar estimates. Real integration acceptance is **not** implied by implementing an adapter.
+
+| Milestone | Current evidence | Remaining release gate |
+| --- | --- | --- |
+| M0 | Pinned libraries/lock; Claude 2.1.309 MCP connection; OpenCode 2.2.5 real config/events with mock provider | Real hook payload; live API capability smoke |
+| M1 | Typed config/contracts, outbound snapshots, consultant/review CLI + stdio MCP, bounded SDK adapter, private history | Opt-in paid consultation; effort settings intentionally unsupported |
+| M2 | SQLite v1 migration, durable queue/events/artifacts/accounting, shared concurrency, runner lock/leases/heartbeat, idempotency, cancellation, restart interruption, retention | Broader host crash/process ownership exercise; no blind retry |
+| M3 | Dedicated worktrees, scoped config, patch/verification evidence; local OpenCode 2.2.5 native edit and process stop checked | Live provider worker; other supported hosts; adapter disabled by default, enabled for verified local pin |
+| M4 | Trusted task/scope registry, hash/expiry-bound interactive approvals, local hooks/dedup, passive report validation | Real installed hook fixture and opt-in live research; auto mode remains disabled by default |
+| M5 | Doctor, service commands, export/delete/prune, operations/rollback, CI definition; local launchd install/heartbeat | Service removal, Linux install and CI matrix on real hosts; live benchmarks and owner review outcomes |
+
+See [release notes](release-notes.md), [compatibility](compatibility.md), and [operations](operations.md).
 
 ## Requirements and release sequence
 
@@ -69,7 +80,7 @@ Acceptance: another local installation can reproduce setup and rollback from doc
 6. M4 trusted scopes/approval tests, then hooks and researcher.
 7. M5 installation, runbooks, compatibility evidence and benchmark.
 
-Each slice should be independently reviewable. Introduce tests alongside behavior; this documentation scaffold does not provide runnable hooks or a working server.
+Each slice should be independently reviewable. Introduce tests alongside behavior; the CLI/server/runner now exist, while live compatibility gates above remain explicit.
 
 ## Unresolved decisions
 

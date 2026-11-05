@@ -1,6 +1,6 @@
 # Security research escalation policy
 
-Status: proposed escalation and authorization policy. Default: automatic escalation for eligible technical blockers; owner approval for sensitive or ambiguous cases.
+Status: policy implemented and exercised offline. Automatic dispatch defaults off until installed-version hook compatibility is verified; explicit research creates a pending owner approval. When enabled, eligible technical blockers queue automatically, while sensitive or ambiguous cases require owner approval.
 
 ## Decision policy
 

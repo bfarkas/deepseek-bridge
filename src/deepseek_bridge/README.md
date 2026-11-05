@@ -1,18 +1,15 @@
-# Planned source package
+# Source layout
 
-Scaffold only. Add executable modules in the implementation milestones rather than shipping empty functions that appear operational.
+CLI and FastMCP adapters share `Service`; credentials are supplied only to the direct provider or explicitly configured host adapter.
 
 | Module | Responsibility |
 | --- | --- |
-| `cli.py`, `server.py` | CLI and FastMCP stdio adapters |
-| `settings.py`, `contracts.py` | Typed config and versioned request/report models |
-| `context.py`, `policy.py`, `approvals.py` | Context selection, trusted scopes, owner approval |
-| `consultant.py`, `review.py`, `research.py` | Role-specific provider services |
-| `provider.py` | Direct DeepSeek SDK adapter and capability mapping |
-| `jobs.py`, `runner.py` | Durable lifecycle, leases, supervision, cancellation |
-| `worktrees.py`, `processes.py`, `opencode.py` | Dedicated worktrees, host process ownership/cancellation, worker events |
-| `verification.py` | Independent host verification commands and evidence |
-| `hooks.py` | Event validation, policy evaluation, deduplication |
-| `database.py`, `accounting.py`, `artifacts.py` | Persistence, usage, safe output publication |
+| `cli.py`, `server.py`, `service.py` | Local CLI, seven stdio tools, application facade |
+| `settings.py`, `contracts.py`, `errors.py` | Typed owner configuration, versioned contracts, sanitized errors |
+| `context.py`, `policy.py`, `research.py`, `hooks.py` | Explicit snapshots, private trusted scopes/tasks, owner approval and passive dispatch |
+| `consultant.py`, `provider.py`, `accounting.py` | Consultation/review, direct SDK calls, nullable usage and versioned estimates |
+| `database.py`, `runner.py`, `artifacts.py` | Atomic SQLite migrations/lifecycle/leases, separate runner, checksummed publication |
+| `worktrees.py`, `opencode.py`, `processes.py`, `worker.py` | Dedicated Git worktrees, gated host adapter, process ownership, independent verification/handoff |
+| `maintenance.py`, `services.py` | Retention/export/delete and explicit user service installation |
 
-Dependencies flow from adapters to services and domain contracts. Provider, subprocess, clock, and filesystem boundaries must be injectable for offline tests.
+Provider boundaries are injectable. Tests use real fixture Git repositories and POSIX processes with fake provider/harness responses. Host execution is not a filesystem/network sandbox. Live integration evidence is tracked in docs/compatibility.md.

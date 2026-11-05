@@ -1,15 +1,15 @@
 # Claude Code integration and operations
 
-Status: intended installation workflow after implementation; these commands are not runnable in this scaffold.
+Status: CLI and stdio MCP are implemented; real registration/connection passed with Claude Code 2.1.309. Hooks are registered but actual hook payload compatibility remains unverified. See [operations](operations.md) for current setup and recovery, and [compatibility](compatibility.md) before enabling automatic hooks.
 
 ## Authentication and installation
 
-Keep normal Claude Code subscription login. Do not set `ANTHROPIC_BASE_URL`, replace Claude credentials, or route the Claude session through DeepSeek. Only the bridge/provider client uses the configured DeepSeek endpoint and `DEEPSEEK_API_KEY`. Use a private environment or an operating-system credential-store launcher; do not include the key in MCP command arguments or tracked settings.
+Keep normal Claude Code subscription login. Do not set `ANTHROPIC_BASE_URL`, replace Claude credentials, or route the Claude session through DeepSeek. Only the bridge/provider client uses the configured DeepSeek endpoint and `DEEPSEEK_API_KEY`. Use the private credential file, environment, or dedicated macOS Keychain item described in operations; do not include the key in MCP command arguments or tracked settings.
 
 The intended executable will register as a user-scoped local stdio server, consistent with [Claude's MCP documentation](https://code.claude.com/docs/en/mcp):
 
 ```sh
-# Planned commands after package implementation and installation
+# After package installation
 claude mcp add --scope user --transport stdio deepseek-bridge -- /absolute/path/to/deepseek-bridge serve
 deepseek-bridge doctor
 ```
@@ -26,7 +26,7 @@ For research escalation, tell agents to emit the [structured marker](contracts.m
 
 ## Hooks
 
-After implementation, merge generated hook entries into the owner's existing settings; do not overwrite the file. Start with `Stop` and `SubagentStop` invoking an absolute launcher path with `hook`. Add optional telemetry events only after compatibility checks. Paths with spaces require platform-correct quoting in generated command strings.
+After verifying installed-version compatibility, merge bridge hook entries into the owner's existing settings; do not overwrite the file. Start with `Stop` and `SubagentStop` invoking an absolute launcher path with `hook`. Add optional telemetry events only after compatibility checks. Paths with spaces require platform-correct quoting in generated command strings.
 
 Validate `/hooks`, capture a sanitized event fixture, and exercise a controlled technical blocker. Verify that pending approval sends no data and duplicates enqueue once. The hook persists the job and returns promptly. The runner works independently; the active or resumed Claude session explicitly retrieves the result rather than being promised automatic resumption.
 

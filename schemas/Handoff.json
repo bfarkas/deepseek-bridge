@@ -1,0 +1,146 @@
+{
+  "$defs": {
+    "Context": {
+      "additionalProperties": false,
+      "properties": {
+        "repository": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Repository"
+        },
+        "files": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Files",
+          "type": "array"
+        },
+        "text": {
+          "default": "",
+          "title": "Text",
+          "type": "string"
+        },
+        "diff": {
+          "default": "",
+          "title": "Diff",
+          "type": "string"
+        }
+      },
+      "title": "Context",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "task_id": {
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Task Id",
+      "type": "string"
+    },
+    "revision": {
+      "minimum": 1,
+      "title": "Revision",
+      "type": "integer"
+    },
+    "task_status": {
+      "enum": [
+        "blocked",
+        "completed"
+      ],
+      "title": "Task Status",
+      "type": "string"
+    },
+    "blocker_type": {
+      "enum": [
+        "technical_uncertainty",
+        "expertise_gap",
+        "sensitive",
+        "ambiguous",
+        "permission_denied",
+        "safety_boundary"
+      ],
+      "title": "Blocker Type",
+      "type": "string"
+    },
+    "role": {
+      "const": "security_researcher",
+      "default": "security_researcher",
+      "title": "Role",
+      "type": "string"
+    },
+    "scope_id": {
+      "title": "Scope Id",
+      "type": "string"
+    },
+    "objective": {
+      "maxLength": 30000,
+      "minLength": 1,
+      "title": "Objective",
+      "type": "string"
+    },
+    "attempted_approaches": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Attempted Approaches",
+      "type": "array"
+    },
+    "verified_findings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Verified Findings",
+      "type": "array"
+    },
+    "open_hypotheses": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Open Hypotheses",
+      "type": "array"
+    },
+    "acceptance_criteria": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Acceptance Criteria",
+      "type": "array"
+    },
+    "context": {
+      "$ref": "#/$defs/Context"
+    },
+    "action": {
+      "const": "passive_analysis",
+      "default": "passive_analysis",
+      "title": "Action",
+      "type": "string"
+    }
+  },
+  "required": [
+    "task_id",
+    "revision",
+    "task_status",
+    "blocker_type",
+    "scope_id",
+    "objective",
+    "acceptance_criteria"
+  ],
+  "title": "Handoff",
+  "type": "object"
+}

@@ -1,11 +1,13 @@
-# Proposed schema only; no configuration loader exists yet. No secrets here.
+# Copy to ~/.config/deepseek-bridge/config.toml, outside repositories; chmod 600.
+# Supply the key through the private credentials.json file, environment, or macOS Keychain.
+# Never put the key in this TOML file or command arguments; see docs/operations.md.
 [deepseek]
 base_url = "https://api.deepseek.com/anthropic"
 api_key_env = "DEEPSEEK_API_KEY"
 consultant_model = "deepseek-flash"
 review_model = "deepseek-v4-pro"
 research_model = "deepseek-v4-pro"
-# Effort mapping is capability-checked in M0, not assumed universal.
+# Explicit effort is rejected until its mapping has live compatibility evidence.
 
 [consultant]
 max_files = 20
@@ -18,29 +20,49 @@ max_concurrent = 1
 max_concurrent_limit = 3
 default_timeout_seconds = 1800
 max_timeout_seconds = 3600
-# Dollar caps are estimates, not exact guarantees.
 estimated_cost_limit_usd = 2.0
 
 [worker]
 backend = "host"
-executable = "opencode" # Resolve and validate the executable during setup.
+enabled = false
+compatibility_verified = false
+executable = "opencode"
+# Set to the exact output of your tested executable's --version, then record evidence.
+# expected_version = "YOUR_VERIFIED_VERSION"
 model = "deepseek/deepseek-v4-pro"
-worktree_root = "/absolute/path/to/private/worker-worktrees"
-# Run in the dedicated worktree with per-job config and an explicit environment.
-# Host account permissions/networking apply; no filesystem sandbox is implied.
+# worktree_root = "/absolute/private/path/to/worker-worktrees"
+max_output_bytes = 2000000
 
 [research]
-mode = "automatic_with_approval"
+mode = "manual"
 require_trusted_scope = true
 max_auto_escalations_per_task_revision = 1
 active_tools_enabled = false
+compatibility_verified = false
 
 [storage]
-state_dir = "/absolute/path/to/private/bridge-state" # Set for the host platform.
+# Defaults to ~/.local/state/deepseek-bridge; keep outside repositories.
+# state_dir = "/absolute/private/path/to/bridge-state"
 database_filename = "bridge.sqlite3"
 retention_days = 30
 
-[repositories.example-project]
-path = "/absolute/path/to/approved/repository"
-verification_profile = "approved-tests"
-# Owner-maintained research scopes live in private configuration outside this repo.
+# Register only repositories you intentionally permit for outbound selection.
+# [repositories.example-project]
+# path = "/absolute/path/to/approved/repository"
+# verification_profile = "approved-tests"
+# preparation_profile = "dependencies"
+# shared_resources = ["cache:project-build", "service:local-test-db"]
+# [profiles.approved-tests]
+# commands = [["/absolute/path/to/python", "-I", "-B", "-m", "pytest", "-q"]]
+# version_commands = [["/absolute/path/to/python", "--version"]]
+# environment = { LANG = "en_US.UTF-8" }
+# [profiles.dependencies]
+# commands = [["/absolute/path/to/uv", "sync", "--frozen"]]
+
+# Top-level scope_registry must precede TOML tables; see docs/operations.md.
+# No default prices: unknown cost stays null. Add owner-maintained, versioned prices:
+# [prices.deepseek-flash]
+# version = "owner-verified-YYYY-MM-DD"
+# input_per_million = 0.0
+# output_per_million = 0.0
+# cached_per_million = 0.0

@@ -1,6 +1,6 @@
 # ADR 0001: Local explicit delegation with separate authority
 
-Status: proposed implementation baseline.
+Status: accepted implementation baseline; host-worker and automatic-research release gates remain unverified on real installed tools.
 
 ## Decision
 

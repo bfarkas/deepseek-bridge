@@ -1,0 +1,2 @@
+{"type":"text","modelID":"fixture-model","part":{"type":"text","text":"Fixture completed"}}
+{"type":"step_finish","part":{"type":"step-finish","tokens":{"input":10,"output":5,"cache":{"read":0}}}}

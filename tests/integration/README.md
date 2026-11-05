@@ -1,3 +1,3 @@
-# tests/integration
+# Integration tests
 
-Planned disposable Git/SQLite/fake-runner tests and separately marked host OpenCode/toolchain smoke tests. Live provider and actual Claude hook smoke tests remain opt-in.
+Real fixture Git/worktrees, binary/new/deleted patches, independent host pytest verification, original-checkout preservation, fake executable pinning/config checks, real process groups, and FastMCP in-process plus stdio subprocess transport. The OpenCode executable and DeepSeek responses are fake. The separate-runner test disconnects MCP while runner execution finishes independently. See docs/compatibility.md for unrun live checks.

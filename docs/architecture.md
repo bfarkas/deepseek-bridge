@@ -1,6 +1,6 @@
 # Architecture
 
-Status: proposed design. Component boundaries and enforcement mechanisms require validation before implementation.
+Status: implemented local baseline with gated host-worker and automatic-hook adapters. See [compatibility](compatibility.md) for observed evidence and [release notes](release-notes.md) for limitations. The sections below describe the intended architecture; exact operational behavior is documented in [operations](operations.md).
 
 ## Roles and boundaries
 

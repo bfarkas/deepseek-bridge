@@ -1,3 +1,3 @@
-# prompts
+# Role prompts
 
-Planned role prompts: consultant.md, reviewer.md, coding-worker.md, security-researcher.md. Prompts specify result schemas and distinguish evidence from inference; permissions are enforced in code.
+The text-only consultant system prompt and review/research JSON schema instructions are in `consultant.py`. Host coding prompts are generated in `worker.py` from validated requests. They treat model instructions as work descriptions, never as owner authorization. Passive researchers have no shell, browsing, scanning, or exploit tools; model references are unverified and model claims of verified findings are downgraded to inference.
