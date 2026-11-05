@@ -74,49 +74,6 @@ def worker_environment(settings: Settings, private: Path, worktree: Path) -> dic
     return env
 
 
-def validate_effective(raw: bytes, config_path: Path | None = None) -> None:
-    try:
-        config: dict[str, Any] = json.loads(raw)
-    except (ValueError, UnicodeError) as exc:
-        raise BridgeError(
-            "worker_unavailable", "Cannot parse effective OpenCode configuration"
-        ) from exc
-    if isinstance(config, list):
-        validate_sources(config, config_path)
-        return
-    if not isinstance(config, dict):
-        raise BridgeError("permission_boundary", "Unexpected OpenCode configuration shape")
-    if (
-        config.get("plugin")
-        or config.get("mcp")
-        or config.get("instructions")
-        or config.get("command")
-        or config.get("agent")
-    ):
-        raise BridgeError("permission_boundary", "Unexpected effective configuration extensions")
-    expected = {
-        "*": "deny",
-        "read": "allow",
-        "edit": "allow",
-        "glob": "allow",
-        "grep": "allow",
-        "bash": {"*": "deny"},
-        "external_directory": "deny",
-    }
-    if config.get("permission") != expected:
-        raise BridgeError("permission_boundary", "Effective worker permissions are not scoped")
-    required = {
-        "autoupdate": False,
-        "share": "disabled",
-        "snapshot": False,
-        "enabled_providers": ["deepseek"],
-        "lsp": False,
-        "formatter": False,
-    }
-    if any(config.get(key) != value for key, value in required.items()):
-        raise BridgeError("permission_boundary", "Unexpected effective runtime options")
-
-
 def parse_events(raw: bytes) -> dict[str, Any]:
     events = []
     model = None
@@ -152,7 +109,6 @@ def parse_events(raw: bytes) -> dict[str, Any]:
     return {
         "model": model,
         **tokens,
-        "cost_usd_estimate": None,
         "event_count": len(events),
         "events_sha256": hashlib.sha256(raw).hexdigest(),
     }
@@ -171,10 +127,16 @@ def within_token_budget(raw: bytes, output_limit: int) -> bool:
     return total <= output_limit
 
 
-def validate_sources(sources: list[Any], config_path: Path | None) -> None:
-    """OpenCode v2 returns normalized source documents instead of a merged v1 object."""
-    if config_path is None:
-        raise BridgeError("permission_boundary", "Expected configuration path is required")
+def validate_effective(raw: bytes, config_path: Path) -> None:
+    """OpenCode v2 returns normalized source documents instead of a merged object."""
+    try:
+        sources: Any = json.loads(raw)
+    except (ValueError, UnicodeError) as exc:
+        raise BridgeError(
+            "worker_unavailable", "Cannot parse effective OpenCode configuration"
+        ) from exc
+    if not isinstance(sources, list):
+        raise BridgeError("permission_boundary", "Unexpected OpenCode configuration shape")
     document = None
     expected_directory = config_path.parent / "config/opencode"
     for source in sources:

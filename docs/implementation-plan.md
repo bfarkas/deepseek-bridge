@@ -1,5 +1,7 @@
 # Implementation plan
 
+Note: hook-based automatic research, price estimates, leases, and the tables behind them were later removed as unused; see [operations](operations.md) for current behavior.
+
 Status: implementation baseline delivered with offline validation; this document retains the original release acceptance backlog. Milestones are ordered by dependency, not calendar estimates. Real integration acceptance is **not** implied by implementing an adapter.
 
 | Milestone | Current evidence | Remaining release gate |

@@ -63,30 +63,6 @@
           "default": null,
           "title": "Cache Creation Input Tokens"
         },
-        "cost_usd_estimate": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Cost Usd Estimate"
-        },
-        "pricing_version": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Pricing Version"
-        },
         "provider_request_id": {
           "anyOf": [
             {

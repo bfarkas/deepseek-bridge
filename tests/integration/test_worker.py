@@ -13,6 +13,8 @@ from deepseek_bridge.service import Service
 from deepseek_bridge.settings import Profile, Settings
 from deepseek_bridge.worktrees import base_sha, create, git, patch, snapshot
 
+FIXTURES = Path(__file__).parents[1] / "fixtures"
+
 
 @pytest.fixture
 def worker_settings(settings: Settings, tmp_path: Path) -> Settings:
@@ -21,13 +23,14 @@ def worker_settings(settings: Settings, tmp_path: Path) -> Settings:
     executable.write_text(
         "#!"
         + sys.executable
-        + "\n"
+        + f"\nFIXTURE = {str(FIXTURES / 'opencode-v2.2.5-config.json')!r}\n"
         + """
 import json, os, pathlib, sys
 if sys.argv[1:] == ["--version"]:
     print("fixture-1")
 elif sys.argv[1:3] == ["debug", "config"]:
-    print(pathlib.Path(os.environ["OPENCODE_CONFIG"]).read_text())
+    config = pathlib.Path(os.environ["OPENCODE_CONFIG"])
+    print(pathlib.Path(FIXTURE).read_text().replace("/fixture/private", str(config.parent)))
 else:
     assert not os.environ.get("ANTHROPIC_API_KEY")
     assert not os.environ.get("SSH_AUTH_SOCK")
@@ -182,14 +185,14 @@ def test_symlink_patch_rejected(worker_settings: Settings) -> None:
 
 
 def test_effective_config_and_event_fixtures() -> None:
-    raw = (Path(__file__).parents[1] / "fixtures/opencode-events.jsonl").read_bytes()
+    raw = (FIXTURES / "opencode-events.jsonl").read_bytes()
     assert parse_events(raw)["output_tokens"] == 5
     for raw in [b"not-json", b"{}", b'{"type":"error"}', b""]:
         with pytest.raises(BridgeError):
             parse_events(raw)
-    for raw in [b"bad", b'{"plugin":["unapproved"]}', b'{"permission":{"*":"allow"}}']:
+    for raw in [b"bad", b'{"plugin":["unapproved"]}', b"[]"]:
         with pytest.raises(BridgeError):
-            validate_effective(raw)
+            validate_effective(raw, Path("/fixture/private/opencode.json"))
 
 
 def test_runner_survives_stdio_mcp_disconnect(
@@ -281,7 +284,7 @@ def test_explicit_retry_links_attempt_and_keeps_base(worker_settings: Settings) 
 
 
 def test_real_v2_configuration_fixture() -> None:
-    raw = (Path(__file__).parents[1] / "fixtures/opencode-v2.2.5-config.json").read_bytes()
+    raw = (FIXTURES / "opencode-v2.2.5-config.json").read_bytes()
     path = Path("/fixture/private/opencode.json")
     validate_effective(raw, path)
     data = json.loads(raw)
@@ -293,13 +296,12 @@ def test_real_v2_configuration_fixture() -> None:
 
 
 def test_real_v2_native_edit_events() -> None:
-    raw = (Path(__file__).parents[1] / "fixtures/opencode-v2.2.5-events.jsonl").read_bytes()
+    raw = (FIXTURES / "opencode-v2.2.5-events.jsonl").read_bytes()
     usage = parse_events(raw)
     assert usage["model"] is None  # Installed v2 does not report a model ID in these events.
     assert usage["input_tokens"] == 20
     assert usage["output_tokens"] == 10
     assert usage["cached_input_tokens"] == 0
-    assert usage["cost_usd_estimate"] is None  # Mock-provider cost is not a bill.
     events = [json.loads(line) for line in raw.splitlines()]
     edit = next(event for event in events if event["type"] == "tool_use")
     assert edit["part"]["tool"] == "write"

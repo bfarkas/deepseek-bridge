@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from .settings import Settings
 
 
-DEFAULT_FILE = Path.home() / ".config/deepseek-bridge/credentials.json"
 KEYCHAIN_SERVICE = "deepseek-bridge"
 
 

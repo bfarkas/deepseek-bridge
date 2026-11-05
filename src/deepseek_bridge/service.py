@@ -164,7 +164,6 @@ class Service:
             "worker_enabled": self.settings.worker.enabled,
             "worker_compatibility_verified": self.settings.worker.compatibility_verified,
             "opencode_present": bool(shutil.which(self.settings.worker.executable)),
-            "automatic_research_verified": self.settings.research.compatibility_verified,
         }
         with self.db.connect() as db:
             checks["database_schema"] = db.execute("PRAGMA quick_check").fetchone()[0] == "ok"
@@ -177,15 +176,6 @@ class Service:
                 checks["worker_ready"] = True
             except BridgeError:
                 pass
-        checks["trusted_registry"] = False
-        if self.settings.research.mode == "automatic_with_approval":
-            try:
-                from .policy import load_registry
-
-                load_registry(self.settings)
-                checks["trusted_registry"] = True
-            except BridgeError:
-                pass
         required = [
             "configuration",
             "database_schema",
@@ -195,8 +185,6 @@ class Service:
         ]
         if self.settings.worker.enabled:
             required.append("worker_ready")
-        if self.settings.research.mode == "automatic_with_approval":
-            required.extend(["trusted_registry", "automatic_research_verified"])
         actions = []
         if not checks["credential_present"]:
             actions.append("Set DEEPSEEK_API_KEY in the private credential file or macOS Keychain")

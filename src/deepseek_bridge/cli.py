@@ -66,7 +66,6 @@ def parser() -> argparse.ArgumentParser:
         command.add_argument("job_id")
         if name != "show":
             command.add_argument("--request-hash", required=True)
-    sub.add_parser("hook")
     sub.add_parser("prune")
     service = sub.add_parser("service")
     service.add_argument("action", choices=["install", "remove"])
@@ -132,11 +131,6 @@ def dispatch(args: argparse.Namespace, service: Service) -> Any:
                     raise BridgeError("approval_required", "Owner did not confirm")
             service.research.decide(args.job_id, args.request_hash, args.action == "approve")
             return service.status(args.job_id)
-        case "hook":
-            from .hooks import MAX_EVENT_BYTES, ingest
-
-            ingest(sys.stdin.buffer.read(MAX_EVENT_BYTES + 1), service.settings, service.db)
-            return None
         case "prune":
             from .maintenance import prune
 

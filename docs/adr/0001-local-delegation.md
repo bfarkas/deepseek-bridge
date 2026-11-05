@@ -1,6 +1,6 @@
 # ADR 0001: Local explicit delegation with separate authority
 
-Status: accepted implementation baseline; host-worker and automatic-research release gates remain unverified on real installed tools.
+Status: accepted implementation baseline; host-worker and research release gates remain unverified on real installed tools.
 
 ## Decision
 
@@ -17,7 +17,7 @@ Run OpenCode directly on the host in a dedicated Git worktree per job. Use local
 - **DeepSeek Harness:** potential replacement adapter after evaluation; OpenCode is the initial candidate, not an assertion of superior performance.
 - **Containerized OpenCode:** provides a stronger execution boundary but adds file-access, dependency, networking, and artifact-collection complexity. Not included in the initial host backend; reconsider separately if stronger containment is required.
 - **Natural-language refusal detection:** unreliable and cannot establish authorization; explicit typed handoffs are required.
-- **Detached worker processes spawned by hooks:** fragile ownership and restart behavior; use a persisted queue and supervised runner.
+- **Detached worker processes:** fragile ownership and restart behavior; use a persisted queue and supervised runner.
 
 ## Consequences
 

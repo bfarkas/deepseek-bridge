@@ -28,7 +28,7 @@ Consultation result envelope:
   "request_id": "opaque-id",
   "status": "completed",
   "data": {"recommendation": "...", "alternatives": [], "risks": []},
-  "usage": {"input_tokens": null, "output_tokens": null, "cached_input_tokens": null, "cost_usd_estimate": null},
+  "usage": {"input_tokens": null, "output_tokens": null, "cached_input_tokens": null},
   "error": null
 }
 ```
@@ -83,10 +83,10 @@ Each verification entry records trusted command argv, working directory, workspa
 }
 ```
 
-An agent emits exactly one envelope between `DEEPSEEK_HANDOFF_BEGIN` and `DEEPSEEK_HANDOFF_END` in its final response. The hook takes session/agent identity from the event, validates a bounded envelope, resolves trusted task/scope records, and records a canonical hash. It does not search prose for refusal keywords.
+An explicit `research` request validates a bounded envelope, resolves trusted task/scope records, and records a canonical hash. Every accepted handoff becomes a pending proposal.
 
-Deduplicate by session, task, revision, and role across `Stop` and `SubagentStop`. Permit at most one automatic escalation per trusted task revision; the agent cannot reset that counter by inventing a new ID. Bind revisions to owner-created task records or an explicit owner-approved new revision.
+Bind revisions to owner-created task records. A repeated request creates a separate proposal; the owner approves each one.
 
 ## CLI surface
 
-`deepseek-bridge serve`, `runner`, `doctor`, `ask`, `review`, `research`, `jobs start|list|status|result|cancel|retry|review|export|delete`, `approvals show|approve|reject`, and `hook` share the same services. `approvals approve <id> --request-hash <hash>` displays scope, outbound context manifest, requested action, limits, and expiry, then records interactive owner confirmation. No credentials appear in command arguments.
+`deepseek-bridge serve`, `runner`, `doctor`, `ask`, `review`, `research`, `jobs start|list|status|result|cancel|retry|review|export|delete`, and `approvals show|approve|reject` share the same services. `approvals approve <id> --request-hash <hash>` displays scope, outbound context manifest, requested action, limits, and expiry, then records interactive owner confirmation. No credentials appear in command arguments.

@@ -22,7 +22,6 @@ def delete_job(service: Service, job_id: str) -> None:
     # Only this validated UUID directory under the private artifact root is removable.
     shutil.rmtree(directory)
     with service.db.transaction() as db:
-        db.execute("DELETE FROM api_usage WHERE job_id=?", (job_id,))
         db.execute("DELETE FROM jobs WHERE id=?", (job_id,))
 
 
@@ -30,8 +29,6 @@ def prune(service: Service) -> dict[str, Any]:
     cutoff = time.time() - service.settings.storage.retention_days * 86400
     with service.db.transaction() as db:
         consultations = db.execute("DELETE FROM consultations WHERE updated<?", (cutoff,)).rowcount
-        db.execute("DELETE FROM api_usage WHERE created<? AND job_id IS NULL", (cutoff,))
-        db.execute("DELETE FROM telemetry WHERE created<?", (cutoff,))
         ids = [r[0] for r in db.execute("SELECT id FROM jobs WHERE updated<?", (cutoff,))]
     removed, retained = [], []
     for job_id in ids:

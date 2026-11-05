@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from .accounting import account, preflight
+from .accounting import account
 from .context import check_text, check_value, collect
 from .contracts import Ask, Envelope, ResearchReport, ReviewReport
 from .database import Database
@@ -78,12 +78,6 @@ class Consultant:
                 report_type.model_json_schema()
             )
         model = getattr(self.settings.deepseek, request.model + "_model")
-        preflight(
-            self.settings,
-            model,
-            len(json.dumps(messages).encode()) + len(system.encode()),
-            request.max_output_tokens,
-        )
         with self.db.reserve_api(
             self.settings.jobs.max_concurrent, self.settings.consultant.timeout_seconds, job_id
         ):
@@ -102,11 +96,11 @@ class Consultant:
             raise BridgeError(
                 "parse_error", "Provider returned no content blocks; usage may be unknown"
             )
-        usage = account(response, self.settings)
+        usage = account(response)
         consultation_id = request.consultation_id or uuid.uuid4().hex
         # Full provider blocks survive continuation (including thinking/signature fields).
         messages.append({"role": "assistant", "content": blocks})
-        self.db.save_history(consultation_id, messages, usage.model_dump())
+        self.db.save_history(consultation_id, messages)
         text = "\n".join(b.get("text", "") for b in blocks if b.get("type") == "text")
         data: dict[str, Any] = {"text": text, "consultation_id": consultation_id}
         status, error = "completed", None

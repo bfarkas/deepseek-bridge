@@ -2,7 +2,7 @@
 
 A local delegation bridge for Claude Code, with explicit DeepSeek consultation, durable coding jobs, and scoped passive security research. Claude keeps its subscription authentication; DeepSeek calls use a separate credential and billing.
 
-The consultant CLI and seven stdio MCP tools are implemented. SQLite, a separate runner, reviewable artifacts, a gated host OpenCode adapter, and owner-bound research approvals are included. **Real Claude Code hooks, OpenCode execution, service-manager installation, and paid DeepSeek calls have not been validated on this installation.** Coding and automatic hooks default off until their compatibility gates pass. See [compatibility evidence](docs/compatibility.md) and [release status](docs/release-notes.md).
+The consultant CLI and seven stdio MCP tools are implemented. SQLite, a separate runner, reviewable artifacts, a gated host OpenCode adapter, and owner-bound research approvals are included. **OpenCode execution, service-manager installation, and paid DeepSeek calls have not been validated on this installation.** Coding defaults off until its compatibility gate passes. See [compatibility evidence](docs/compatibility.md) and [release status](docs/release-notes.md).
 
 ## Install and consult
 
@@ -27,7 +27,7 @@ deepseek-bridge review "Review this selected diff" --diff-file /tmp/selected.pat
 deepseek-bridge doctor
 ```
 
-These consultation commands send the explicit task/context to DeepSeek and incur separate usage. No paid call is made by `doctor`, hooks, or offline tests. Never set `ANTHROPIC_BASE_URL` or replace Claude credentials for this bridge.
+These consultation commands send the explicit task/context to DeepSeek and incur separate usage. No paid call is made by `doctor` or offline tests. Never set `ANTHROPIC_BASE_URL` or replace Claude credentials for this bridge.
 
 ## Claude Code
 

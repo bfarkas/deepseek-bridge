@@ -58,8 +58,6 @@ class Usage(StrictModel):
     output_tokens: int | None = None
     cached_input_tokens: int | None = None
     cache_creation_input_tokens: int | None = None
-    cost_usd_estimate: float | None = None
-    pricing_version: str | None = None
     provider_request_id: str | None = None
 
 

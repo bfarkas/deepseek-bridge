@@ -13,7 +13,6 @@ from .errors import BridgeError
 from .settings import Settings, private_dir
 
 TERMINAL = {"completed", "failed", "timed_out", "interrupted", "cancelled", "rejected", "expired"}
-ACTIVE = {"preparing", "running", "verifying", "cancelling"}
 TRANSITIONS = {
     "pending_approval": {"queued", "rejected", "expired", "cancelled"},
     "queued": {"preparing", "cancelled", "timed_out"},
@@ -61,6 +60,12 @@ CREATE TABLE telemetry (id INTEGER PRIMARY KEY, event TEXT NOT NULL, created REA
 CREATE INDEX jobs_queue ON jobs(state,created);
 CREATE INDEX events_job ON job_events(job_id,seq);
 """
+V2 = """
+ALTER TABLE jobs DROP COLUMN lease;
+DROP TABLE api_usage;
+DROP TABLE escalations;
+DROP TABLE telemetry;
+"""
 
 
 class Database:
@@ -77,15 +82,16 @@ class Database:
             db.execute("BEGIN IMMEDIATE")
             try:
                 version = db.execute("PRAGMA user_version").fetchone()[0]
-                if version > 1:
+                migrations = (SCHEMA, V2)
+                if version > len(migrations):
                     raise BridgeError(
                         "invalid_request", "Database schema is newer than this package"
                     )
-                if version == 0:
-                    for statement in SCHEMA.split(";"):
+                for number, migration in enumerate(migrations[version:], version + 1):
+                    for statement in migration.split(";"):
                         if statement.strip():
                             db.execute(statement)
-                    db.execute("PRAGMA user_version=1")
+                    db.execute(f"PRAGMA user_version={number}")
                 db.commit()
             except Exception:
                 db.rollback()
@@ -247,7 +253,7 @@ class Database:
                 )
         return self.get(job_id)
 
-    def claim(self, owner: str, capacity: int, lease_seconds: int = 30) -> dict[str, Any] | None:
+    def claim(self, owner: str, capacity: int) -> dict[str, Any] | None:
         now = time.time()
         with self.transaction() as db:
             expired = db.execute(
@@ -298,8 +304,8 @@ class Database:
                 ):
                     continue
                 db.execute(
-                    "UPDATE jobs SET state='preparing',owner=?,lease=?,updated=? WHERE id=?",
-                    (owner, now + lease_seconds, now, row["id"]),
+                    "UPDATE jobs SET state='preparing',owner=?,updated=? WHERE id=?",
+                    (owner, now, row["id"]),
                 )
                 db.execute(
                     "INSERT INTO job_events(job_id,state,created) VALUES(?,?,?)",
@@ -317,11 +323,6 @@ class Database:
                 "INSERT INTO runner VALUES(1,?,?) ON CONFLICT(id) DO UPDATE SET "
                 "owner=excluded.owner,heartbeat=excluded.heartbeat",
                 (owner, now),
-            )
-            db.execute(
-                "UPDATE jobs SET lease=? WHERE owner=? AND state IN "
-                "('preparing','running','verifying','cancelling')",
-                (now + 30, owner),
             )
 
     def runner_alive(self) -> bool:
@@ -357,24 +358,12 @@ class Database:
             raise BridgeError("invalid_request", "Consultation is missing or expired")
         return json.loads(row[0])
 
-    def save_history(
-        self, consultation_id: str, messages: list[dict[str, Any]], usage: dict[str, Any]
-    ) -> None:
+    def save_history(self, consultation_id: str, messages: list[dict[str, Any]]) -> None:
         with self.transaction() as db:
             db.execute(
                 "INSERT INTO consultations VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET "
                 "messages=excluded.messages,updated=excluded.updated",
                 (consultation_id, json.dumps(messages), time.time()),
-            )
-            db.execute(
-                "INSERT INTO api_usage(consultation_id,payload,created) VALUES(?,?,?)",
-                (consultation_id, json.dumps(usage), time.time()),
-            )
-
-    def telemetry(self, event: str) -> None:
-        with self.transaction() as db:
-            db.execute(
-                "INSERT INTO telemetry(event,created) VALUES(?,?)", (event[:100], time.time())
             )
 
     @contextmanager

@@ -1,15 +1,12 @@
 import json
 import time
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any
 
 import pytest
 from conftest import FakeProvider
 
 from deepseek_bridge.contracts import Handoff
 from deepseek_bridge.errors import BridgeError
-from deepseek_bridge.hooks import BEGIN, END, ingest
 from deepseek_bridge.runner import Runner
 from deepseek_bridge.service import Service
 from deepseek_bridge.settings import Settings
@@ -43,8 +40,6 @@ def scoped(settings: Settings, tmp_path: Path) -> tuple[Settings, Handoff]:
     )
     registry.chmod(0o600)
     settings.scope_registry = registry
-    settings.research.mode = "automatic_with_approval"
-    settings.research.compatibility_verified = True
     handoff = Handoff(
         task_id="task-1",
         revision=1,
@@ -58,17 +53,7 @@ def scoped(settings: Settings, tmp_path: Path) -> tuple[Settings, Handoff]:
     return settings, handoff
 
 
-def event(handoff: Handoff, **updates: Any) -> bytes:
-    payload = {
-        "hook_event_name": "Stop",
-        "session_id": "session-1",
-        "last_assistant_message": BEGIN + "\n" + handoff.model_dump_json() + "\n" + END,
-    }
-    payload.update(updates)
-    return json.dumps(payload).encode()
-
-
-def test_auto_enqueue_dedup_and_runner(scoped: tuple[Settings, Handoff]) -> None:
+def test_approved_research_runs(scoped: tuple[Settings, Handoff]) -> None:
     settings, handoff = scoped
     report = {
         "summary": "Passive analysis",
@@ -80,26 +65,22 @@ def test_auto_enqueue_dedup_and_runner(scoped: tuple[Settings, Handoff]) -> None
     }
     fake = FakeProvider(json.dumps(report))
     service = Service(settings, fake)
-    one = ingest(event(handoff), settings, service.db)
-    two = ingest(
-        event(handoff, hook_event_name="SubagentStop", agent_id="sub-1"), settings, service.db
-    )
-    assert one["id"] == two["id"]
-    assert one["state"] == "queued"
+    job = service.research.enqueue(handoff, "session-1")
+    assert job["state"] == "pending_approval"
     assert not fake.calls
+    service.research.decide(job["id"], job["request_hash"], True)
     Runner(Service(settings, fake)).run(once=True)
-    assert service.status(one["id"])["state"] == "completed"
+    assert service.status(job["id"])["state"] == "completed"
     assert len(fake.calls) == 1
     assert "tools" not in fake.calls[0]
-    assert service.result(one["id"])["report"]["hypotheses"] == ["possible cause"]
+    assert service.result(job["id"])["report"]["hypotheses"] == ["possible cause"]
 
 
-def test_sensitive_no_calls_until_owner_approval(scoped: tuple[Settings, Handoff]) -> None:
+def test_no_calls_until_owner_approval(scoped: tuple[Settings, Handoff]) -> None:
     settings, handoff = scoped
-    handoff.blocker_type = "sensitive"
     fake = FakeProvider()
     service = Service(settings, fake)
-    job = ingest(event(handoff), settings, service.db)
+    job = service.research.enqueue(handoff, "session-1")
     assert job["state"] == "pending_approval"
     Runner(service).run(once=True)
     assert not fake.calls
@@ -134,26 +115,14 @@ def test_revalidate_at_dispatch(scoped: tuple[Settings, Handoff], mutation: str)
     assert not fake.calls
 
 
-def test_boundaries_telemetry_and_recursive_stop(scoped: tuple[Settings, Handoff]) -> None:
+def test_boundaries_never_enqueue(scoped: tuple[Settings, Handoff]) -> None:
     settings, handoff = scoped
     fake = FakeProvider()
     service = Service(settings, fake)
     for boundary in ["permission_denied", "safety_boundary"]:
         handoff.blocker_type = boundary
-        assert ingest(event(handoff), settings, service.db) is None
         with pytest.raises(BridgeError):
             service.research.enqueue(handoff, "session-1")
-    handoff.blocker_type = "technical_uncertainty"
-    assert ingest(event(handoff, stop_hook_active=True), settings, service.db) is None
-    assert ingest(event(handoff, hook_event_name="StopFailure"), settings, service.db) is None
-    for name in ["PostToolUseFailure", "PermissionDenied", "StopFailure"]:
-        ingest(
-            json.dumps(
-                {"hook_event_name": name, "error": "Please research this API failure"}
-            ).encode(),
-            settings,
-            service.db,
-        )
     assert not service.db.list_jobs()
     assert not fake.calls
 
@@ -208,56 +177,12 @@ def test_forbidden_handoffs_no_provider(scoped: tuple[Settings, Handoff], case: 
     assert not service.db.list_jobs()
 
 
-def test_concurrent_duplicate_claims(scoped: tuple[Settings, Handoff]) -> None:
-    settings, handoff = scoped
-    service = Service(settings, FakeProvider())
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        ids = list(
-            pool.map(lambda _: service.research.enqueue(handoff, "session-1")["id"], range(8))
-        )
-    assert len(set(ids)) == 1
-    assert len(service.db.list_jobs()) == 1
-
-
-def test_reject_expired_and_malformed(scoped: tuple[Settings, Handoff]) -> None:
+def test_rejected_proposal(scoped: tuple[Settings, Handoff]) -> None:
     settings, handoff = scoped
     service = Service(settings, FakeProvider())
     job = service.research.enqueue(handoff, "session-1")
     service.research.decide(job["id"], job["request_hash"], False)
     assert service.db.get(job["id"])["state"] == "rejected"
-    for raw in [
-        b"{bad",
-        b"x" * 250001,
-        event(handoff, last_assistant_message=BEGIN + "bad JSON" + END),
-        event(handoff, last_assistant_message=BEGIN + "{}" + END + BEGIN + "{}" + END),
-    ]:
-        with pytest.raises(BridgeError):
-            ingest(raw, settings, service.db)
-    assert (
-        ingest(event(handoff, last_assistant_message="ordinary text"), settings, service.db) is None
-    )
-
-
-def test_default_auto_gate(scoped: tuple[Settings, Handoff]) -> None:
-    settings, handoff = scoped
-    settings.research.compatibility_verified = False
-    service = Service(settings)
-    with pytest.raises(BridgeError):
-        ingest(event(handoff), settings, service.db)
-    assert not service.db.list_jobs()
-
-
-def test_deleted_result_keeps_revision_tombstone(scoped: tuple[Settings, Handoff]) -> None:
-    from deepseek_bridge.maintenance import delete_job
-
-    settings, handoff = scoped
-    service = Service(settings)
-    job = service.research.enqueue(handoff, "session-1")
-    service.research.decide(job["id"], job["request_hash"], False)
-    delete_job(service, job["id"])
-    with pytest.raises(BridgeError, match="already escalated"):
-        service.research.enqueue(handoff, "session-1", automatic=True)
-    assert not service.db.list_jobs()
 
 
 def test_expired_proposals_do_not_dispatch(scoped: tuple[Settings, Handoff]) -> None:
@@ -288,5 +213,5 @@ def test_database_failure_never_calls_provider(
 
     monkeypatch.setattr(service.db, "transaction", unavailable)
     with pytest.raises(sqlite3.OperationalError):
-        ingest(event(handoff), settings, service.db)
+        service.research.enqueue(handoff, "session-1")
     assert not fake.calls

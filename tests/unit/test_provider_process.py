@@ -1,7 +1,6 @@
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
 
 import anthropic
 import httpx
@@ -11,7 +10,7 @@ from deepseek_bridge.accounting import account
 from deepseek_bridge.errors import BridgeError
 from deepseek_bridge.processes import environment, identity, owns, run, stop_group
 from deepseek_bridge.provider import DeepSeekProvider
-from deepseek_bridge.settings import Price, Settings
+from deepseek_bridge.settings import Settings
 
 
 def test_sdk_transport_offline_timeout_and_429(
@@ -93,23 +92,22 @@ def test_unsupported_effort_before_network(settings: Settings) -> None:
     assert caught.value.code == "unsupported_capability"
 
 
-def test_accounting_unknown_prices_and_cache(settings: Settings) -> None:
-    response: dict[str, Any] = {
-        "model": "deepseek-flash",
-        "usage": {
-            "input_tokens": 100,
-            "output_tokens": 50,
-            "cache_read_input_tokens": 200,
-            "cache_creation_input_tokens": 0,
-        },
-    }
-    assert account(response, settings).cost_usd_estimate is None
-    settings.prices["deepseek-flash"] = Price(
-        version="fixture", input_per_million=1, output_per_million=2, cached_per_million=0.1
+def test_accounting_maps_provider_usage() -> None:
+    usage = account(
+        {
+            "id": "request-1",
+            "model": "deepseek-flash",
+            "usage": {
+                "input_tokens": 100,
+                "output_tokens": 50,
+                "cache_read_input_tokens": 200,
+                "cache_creation_input_tokens": 0,
+            },
+        }
     )
-    assert account(response, settings).cost_usd_estimate == pytest.approx(0.00022)
-    response["usage"].pop("cache_read_input_tokens")
-    assert account(response, settings).cost_usd_estimate is None
+    assert (usage.input_tokens, usage.output_tokens, usage.cached_input_tokens) == (100, 50, 200)
+    assert usage.provider_request_id == "request-1"
+    assert account({}).input_tokens is None
 
 
 def test_env_filter_and_cwd(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -165,25 +163,6 @@ def test_missing_executable(tmp_path: Path) -> None:
     with pytest.raises(BridgeError) as caught:
         run(["/does/not/exist"], tmp_path, environment(), 2)
     assert caught.value.code == "worker_unavailable"
-
-
-def test_configured_price_preflight_blocks_without_api(settings: Settings) -> None:
-    from conftest import FakeProvider
-
-    from deepseek_bridge.contracts import Ask
-    from deepseek_bridge.service import Service
-
-    fake = FakeProvider()
-    settings.prices["deepseek-flash"] = Price(
-        version="fixture",
-        input_per_million=10000,
-        output_per_million=10000,
-        cached_per_million=10000,
-    )
-    with pytest.raises(BridgeError) as caught:
-        Service(settings, fake).ask(Ask(task="Explain"))
-    assert caught.value.code == "budget_exceeded"
-    assert not fake.calls
 
 
 def test_token_event_budget_stops_execution(tmp_path: Path) -> None:

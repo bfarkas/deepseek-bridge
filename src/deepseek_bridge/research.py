@@ -37,51 +37,20 @@ class ResearchService:
             "timeout_seconds": scope.timeout_seconds,
         }
 
-    def enqueue(self, handoff: Handoff, session: str, *, automatic: bool = False) -> dict[str, Any]:
-        if automatic and (
-            self.settings.research.mode != "automatic_with_approval"
-            or not self.settings.research.compatibility_verified
-        ):
-            raise BridgeError(
-                "unsupported_capability", "Automatic hooks have not passed live compatibility"
-            )
+    def enqueue(self, handoff: Handoff, session: str) -> dict[str, Any]:
         prepared = self.prepare(handoff, session)
         scope = policy.resolve(self.settings, handoff, session)
-        needs_approval = (
-            not automatic
-            or scope.sensitive
-            or handoff.blocker_type in {"sensitive", "ambiguous"}
-            or (bool(handoff.context.text or handoff.context.diff) and not scope.allow_inline)
-        )
-        state = "pending_approval" if needs_approval else "queued"
         with self.db.transaction() as db:
-            previous = db.execute(
-                "SELECT job_id FROM escalations WHERE task=? AND revision=? AND role=?",
-                (handoff.task_id, handoff.revision, handoff.role),
-            ).fetchone()
-            if previous:
-                if previous[0] is None:
-                    raise BridgeError(
-                        "invalid_request", "Task revision already escalated; result was deleted"
-                    )
-                row = db.execute("SELECT * FROM jobs WHERE id=?", (previous[0],)).fetchone()
-                return self.db.decode(row)
-            job = self.db.insert_job(db, "research", prepared, 3600, state=state)
+            job = self.db.insert_job(db, "research", prepared, 3600, state="pending_approval")
             db.execute(
-                "INSERT INTO escalations VALUES(?,?,?,?,?)",
-                (session, handoff.task_id, handoff.revision, handoff.role, job["id"]),
+                "INSERT INTO approvals(job_id,request_hash,scope_version,expires) VALUES(?,?,?,?)",
+                (
+                    job["id"],
+                    job["request_hash"],
+                    scope.version,
+                    min(time.time() + 3600, scope.expires),
+                ),
             )
-            if needs_approval:
-                db.execute(
-                    "INSERT INTO approvals(job_id,request_hash,scope_version,expires) "
-                    "VALUES(?,?,?,?)",
-                    (
-                        job["id"],
-                        job["request_hash"],
-                        scope.version,
-                        min(time.time() + 3600, scope.expires),
-                    ),
-                )
             return job
 
     def revalidate(self, job: dict[str, Any], *, approval: bool = True) -> dict[str, Any]:

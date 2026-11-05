@@ -35,7 +35,6 @@ class Jobs(StrictModel):
     max_concurrent_limit: int = Field(default=3, ge=1, le=3)
     default_timeout_seconds: int = Field(default=1800, ge=1, le=3600)
     max_timeout_seconds: int = Field(default=3600, ge=1, le=3600)
-    estimated_cost_limit_usd: float = Field(default=2.0, gt=0)
 
     @model_validator(mode="after")
     def bounds(self) -> "Jobs":
@@ -47,7 +46,6 @@ class Jobs(StrictModel):
 
 
 class Worker(StrictModel):
-    backend: str = "host"
     enabled: bool = False
     executable: str = "opencode"
     expected_version: str | None = None
@@ -56,28 +54,6 @@ class Worker(StrictModel):
     max_output_bytes: int = Field(default=2000000, ge=1000, le=10000000)
     # Set only after recording real effective-config and headless-event evidence.
     compatibility_verified: bool = False
-
-
-class Research(StrictModel):
-    mode: str = "manual"
-    require_trusted_scope: bool = True
-    max_auto_escalations_per_task_revision: int = 1
-    active_tools_enabled: bool = False
-    compatibility_verified: bool = False
-
-    @model_validator(mode="after")
-    def passive_only(self) -> "Research":
-        if (
-            self.active_tools_enabled
-            or not self.require_trusted_scope
-            or self.max_auto_escalations_per_task_revision != 1
-        ):
-            raise ValueError(
-                "Passive research requires trusted scopes and one escalation per revision"
-            )
-        if self.mode not in {"manual", "automatic_with_approval"}:
-            raise ValueError("Unknown research mode")
-        return self
 
 
 class Storage(StrictModel):
@@ -114,23 +90,14 @@ class Profile(StrictModel):
         return self
 
 
-class Price(StrictModel):
-    version: str
-    input_per_million: float = Field(ge=0)
-    output_per_million: float = Field(ge=0)
-    cached_per_million: float = Field(ge=0)
-
-
 class Settings(StrictModel):
     deepseek: DeepSeek = Field(default_factory=DeepSeek)
     consultant: Consultant = Field(default_factory=Consultant)
     jobs: Jobs = Field(default_factory=Jobs)
     worker: Worker = Field(default_factory=Worker)
-    research: Research = Field(default_factory=Research)
     storage: Storage = Field(default_factory=Storage)
     repositories: dict[str, Repository] = Field(default_factory=dict)
     profiles: dict[str, Profile] = Field(default_factory=dict)
-    prices: dict[str, Price] = Field(default_factory=dict)
     scope_registry: Path | None = None
     credentials_file: Path = Field(
         default_factory=lambda: Path.home() / ".config/deepseek-bridge/credentials.json"
@@ -147,8 +114,6 @@ class Settings(StrictModel):
                 raise ValueError("Private state must live outside repositories")
             if worker and worker.resolve().is_relative_to(repo.path.resolve()):
                 raise ValueError("Worker root must live outside registered repositories")
-        if self.worker.backend != "host":
-            raise ValueError("Only the host backend is supported")
         self.storage.state_dir = state
         return self
 
@@ -167,7 +132,7 @@ def load_settings(path: Path | None = None) -> Settings:
     if not path.exists():
         raise BridgeError("invalid_request", "Configuration is missing; copy config.example.toml")
     settings = Settings.model_validate(tomllib.loads(path.read_text()))
-    if settings.worker.enabled or settings.research.mode != "manual":
+    if settings.worker.enabled:
         info = path.stat()
         if path.is_symlink() or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) & 0o077:
             raise BridgeError(

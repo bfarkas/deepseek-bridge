@@ -1,6 +1,6 @@
 # Architecture
 
-Status: implemented local baseline with gated host-worker and automatic-hook adapters. See [compatibility](compatibility.md) for observed evidence and [release notes](release-notes.md) for limitations. The sections below describe the intended architecture; exact operational behavior is documented in [operations](operations.md).
+Status: implemented local baseline with a gated host-worker adapter. See [compatibility](compatibility.md) for observed evidence and [release notes](release-notes.md) for limitations. The sections below describe the intended architecture; exact operational behavior is documented in [operations](operations.md).
 
 ## Roles and boundaries
 
@@ -16,10 +16,8 @@ Claude reviews all external findings and owns integration. Research does not pro
 flowchart TD
     User[User] --> Claude[Claude Code: subscription login]
     Claude --> MCP[FastMCP stdio adapter]
-    Claude --> Hook[Claude hook adapter]
-    Hook --> Policy[Validation and escalation policy]
     MCP --> Core[Application services]
-    Policy --> Core
+    Core --> Policy[Validation and approval policy]
     Core --> API[Direct DeepSeek API client]
     Core --> DB[(SQLite: jobs, approvals, usage)]
     Core --> Queue[Persistent local job queue]
@@ -40,7 +38,7 @@ Worktrees provide change separation, not a filesystem or security sandbox. Host 
 
 The CLI and MCP entry points share application services. They validate typed requests, apply policy, persist intent, and return bounded structured results. MCP stdout is reserved for protocol messages; diagnostics go to stderr with redaction.
 
-A separately managed runner claims queued jobs with transactional leases and heartbeats. It survives the originating Claude turn or MCP process exiting. Hooks enqueue locally and return promptly; they never wait on cloud calls or launch detached workers. Use an operating-system service manager to supervise the runner. Only one runner owns execution, even with multiple MCP clients.
+A separately managed runner claims queued jobs in transactions and records heartbeats. It survives the originating Claude turn or MCP process exiting. Use an operating-system service manager to supervise the runner. Only one runner owns execution, even with multiple MCP clients.
 
 Use the Anthropic Python SDK against DeepSeek's compatible endpoint for consultant/research requests. Preserve complete provider message blocks when continuing conversations. Validate model and effort capabilities, enforce explicit input/output limits, and bound transient-error retries by the request deadline. Do not silently downgrade unsupported parameters or retry an uncertain charge without recording the ambiguity. Keep provider and OpenCode adapters replaceable.
 
@@ -63,23 +61,21 @@ Store runtime data outside repositories in a private owner-only application stat
 
 | Table | Key responsibilities |
 | --- | --- |
-| `jobs` | Immutable request/hash, role, repository/base SHA, state, deadline, lease, attempt |
+| `jobs` | Immutable request/hash, role, repository/base SHA, state, deadline, attempt |
 | `job_events` | Append-only state transitions, redacted errors, timestamps |
 | `consultations` / `messages` | Continuation history, provider blocks, retention expiry |
 | `approvals` | Request hash, scope/policy version, expiry, decision, local actor |
-| `api_usage` | Provider request ID, tokens/cache usage, pricing version, estimate |
 | `artifacts` | Relative storage key, size, media type, checksum |
 | `verification_runs` | Trusted command/profile, exit status, logs and output hash |
-| `escalations` | Session/task/revision identity, unique automatic-handoff key |
 
 Use atomic conditional state updates and a unique deduplication constraint. Publish artifacts through temporary files and atomic rename before referencing them in a final result. Artifacts include `handoff.json`, `summary.md`, `changes.patch` for coding jobs, `test-results.json`, and redacted `events.jsonl`.
 
-On restart reconcile leases with recorded worker/verification process identities, start times, and job ownership. Do not kill a process based only on a reused PID; mark uncertain ownership for manual recovery. Stop execution whose ownership is verified before marking a job `interrupted`; require an explicit retry creating a new attempt. Never blindly rerun a potentially billable request or unfinished coding job. Cancellation first persists intent, then terminates the verified job process group, waits, and escalates to kill after a grace period. Completion and cancellation race through one transactional terminal-state winner.
+On restart reconcile jobs with recorded worker/verification process identities, start times, and job ownership. Do not kill a process based only on a reused PID; mark uncertain ownership for manual recovery. Stop execution whose ownership is verified before marking a job `interrupted`; require an explicit retry creating a new attempt. Never blindly rerun a potentially billable request or unfinished coding job. Cancellation first persists intent, then terminates the verified job process group, waits, and escalates to kill after a grace period. Completion and cancellation race through one transactional terminal-state winner.
 
-Use `null` for unavailable usage, test counts, or cost. Store original usage separately from derived estimates. Prices are versioned inputs; missing prices mean unknown cost. Token/time limits and pre-request reservations reduce spending, but a dollar estimate is not an exact hard cap, particularly during in-flight requests. Preserve whether Claude accepted/rejected a patch as explicit review metadata.
+Use `null` for unavailable usage or test counts. Token/time limits and pre-request reservations reduce spending, but they are not an exact hard cap, particularly during in-flight requests. Preserve whether Claude accepted/rejected a patch as explicit review metadata.
 
 ## Context and retention
 
-Resolve only registered repository aliases. Read explicitly selected files within the real repository root, enforce byte/file limits, and reject path traversal, external symlinks, sensitive-file rules, and unsafe file types. Implement race-resistant file opening and copy a bounded snapshot before transmission. Apply the same outbound policy to inline context, diffs, prior messages, and hook envelopes. Secret scanning is an additional filter, not proof that content is safe to send.
+Resolve only registered repository aliases. Read explicitly selected files within the real repository root, enforce byte/file limits, and reject path traversal, external symlinks, sensitive-file rules, and unsafe file types. Implement race-resistant file opening and copy a bounded snapshot before transmission. Apply the same outbound policy to inline context, diffs, prior messages, and research handoffs. Secret scanning is an additional filter, not proof that content is safe to send.
 
 Do not send full transcripts by default. Repository text and research-state files can suggest work but cannot grant permissions. Trusted scope configuration lives outside worker-writable directories. Runtime logs exclude keys and full prompts; owner-visible artifacts may contain code and findings and require private permissions. Proposed default retention is 30 days with explicit export/delete and safe worktree cleanup restricted to bridge-owned resources.

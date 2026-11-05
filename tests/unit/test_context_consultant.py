@@ -111,7 +111,6 @@ def test_malformed_review_and_unknown_usage(settings: Settings, fake: FakeProvid
     assert result["error"]["code"] == "parse_error"
     assert result["data"]["text"] == "not JSON"
     assert result["usage"]["input_tokens"] is None
-    assert result["usage"]["cost_usd_estimate"] is None
 
 
 def test_model_cannot_claim_verification(settings: Settings) -> None:

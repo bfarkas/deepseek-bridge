@@ -11,7 +11,7 @@ Recorded 2026-11-01. Offline results and public documentation checks are disting
 | Pydantic | 2.12.3 | Versioned strict-extra contracts and schemas tested |
 | psutil | 7.1.3 | Host PID creation-time/UID/group checks; timeout/cancellation fixtures |
 | uv | 0.13.6 used for lock | uv.lock records all transitive versions; no paid calls during resolution |
-| Claude Code | 2.1.309 | Installed; subscription login and real user-scoped stdio MCP connection passed; Stop/SubagentStop entries merged preserving existing hooks. Real hook payload remains unverified |
+| Claude Code | 2.1.309 | Installed; subscription login and real user-scoped stdio MCP connection passed |
 | OpenCode | opencode v2.2.5 (Homebrew) | Real standalone debug config, headless JSON events, native write in disposable Git repo, and process-group timeout checked with local mock provider; no live DeepSeek request |
 | Host toolchain | CPython + pytest 8.4.2 | Independent verification in fixture worktree; other local toolchains untested |
 | DeepSeek | Endpoint documented; live response untested | SDK pointed explicitly at direct endpoint; no credential required for offline suite |
@@ -20,7 +20,7 @@ Recorded 2026-11-01. Offline results and public documentation checks are disting
 
 The [DeepSeek Anthropic compatibility documentation](https://api-docs.deepseek.com/guides/anthropic_api/) documents the direct endpoint and current model names. The adapter accepts `deepseek-flash` and `deepseek-v4-pro`, sends non-thinking text requests, and preserves complete assistant content blocks for continuation. Every explicit effort setting currently returns `unsupported_capability`; exact mappings require a live spike before enabling. No silent effort downgrade occurs.
 
-The API documentation warns that some integrations can exceed requested output tokens. Byte, deadline, and concurrency enforcement reduce spending; token and dollar estimates cannot guarantee the final bill. Missing usage and prices stay null. Owner-provided prices must carry a version. A conservative pre-request byte-based estimate rejects requests exceeding the configured estimated dollar ceiling when prices are known. Only explicit HTTP 429 rejections retry (at most twice); timeouts, connection failures, and server errors remain charge-ambiguous and are not silently replayed.
+The API documentation warns that some integrations can exceed requested output tokens. Byte, deadline, and concurrency enforcement reduce spending; token limits cannot guarantee the final bill. Missing usage stays null. Only explicit HTTP 429 rejections retry (at most twice); timeouts, connection failures, and server errors remain charge-ambiguous and are not silently replayed.
 
 ## OpenCode gate
 
@@ -35,8 +35,6 @@ DEEPSEEK_BRIDGE_LIVE=1 uv run python scripts/live_smoke.py --allow-paid-call
 
 This sends a tiny explicit consultation with a 32-token output limit and prints only model/usage/status. It requires a configured private credential. No live smoke was run during implementation.
 
-For real hooks, manually capture sanitized installed-version Stop/SubagentStop events using [Claude hook semantics](https://code.claude.com/docs/en/hooks), test no-marker, recursion, sensitive approval, duplicate delivery, and telemetry events before setting `research.compatibility_verified=true` and `mode="automatic_with_approval"`. Do not register optional events unless your installed Claude supports them.
-
 ## Remaining release evidence
 
-Real hook payload capture, live DeepSeek consultation/worker/research, worker plus verification process-group behavior across runner crash, service-manager removal, and Linux service installation remain unrun. The macOS runner install/heartbeat and private-file/Keychain loading are implemented; no existing dedicated DeepSeek Keychain item was found, and an empty mode-600 credential file was provisioned. Detached descendants and processes whose identity cannot be proven require manual recovery. Windows is unsupported. Account permissions are the execution boundary; host fixtures establish intended behavior, not malicious-process containment.
+Live DeepSeek consultation/worker/research, worker plus verification process-group behavior across runner crash, service-manager removal, and Linux service installation remain unrun. The macOS runner install/heartbeat and private-file/Keychain loading are implemented; no existing dedicated DeepSeek Keychain item was found, and an empty mode-600 credential file was provisioned. Detached descendants and processes whose identity cannot be proven require manual recovery. Windows is unsupported. Account permissions are the execution boundary; host fixtures establish intended behavior, not malicious-process containment.

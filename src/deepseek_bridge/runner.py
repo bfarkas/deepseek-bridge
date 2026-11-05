@@ -135,11 +135,6 @@ class Runner:
             self.service.artifacts.publish(
                 job_id, "handoff.json", json.dumps(report).encode(), "application/json"
             )
-            with self.db.transaction() as db:
-                db.execute(
-                    "INSERT INTO api_usage(job_id,payload,created) VALUES(?,?,?)",
-                    (job_id, json.dumps(report.get("usage", {})), time.time()),
-                )
             if self.db.get(job_id)["state"] == "cancelling":
                 self.db.transition(job_id, "cancelled", owner=self.owner)
             elif time.time() >= job["deadline"]:

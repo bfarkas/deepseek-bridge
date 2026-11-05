@@ -1,6 +1,6 @@
 # Claude Code integration and operations
 
-Status: CLI and stdio MCP are implemented; real registration/connection passed with Claude Code 2.1.309. Hooks are registered but actual hook payload compatibility remains unverified. See [operations](operations.md) for current setup and recovery, and [compatibility](compatibility.md) before enabling automatic hooks.
+Status: CLI and stdio MCP are implemented; real registration/connection passed with Claude Code 2.1.309. See [operations](operations.md) for current setup and recovery.
 
 ## Authentication and installation
 
@@ -22,19 +22,13 @@ Use MCP directly from the main orchestrator first. An optional native Claude `de
 
 The trusted Claude instructions should say: provide explicit context and acceptance criteria, omit secrets, keep final decisions with Claude, inspect actual patches and verification evidence, and treat model findings as unverified until checked. Independent coding tasks must avoid overlap with active changes. No worker automatically merges, pushes, or deploys.
 
-For research escalation, tell agents to emit the [structured marker](contracts.md) only for a known task and scope. State the blocker accurately; never relabel a permission/safety boundary as technical uncertainty. Do not expose approval tools to agents.
-
-## Hooks
-
-After verifying installed-version compatibility, merge bridge hook entries into the owner's existing settings; do not overwrite the file. Start with `Stop` and `SubagentStop` invoking an absolute launcher path with `hook`. Add optional telemetry events only after compatibility checks. Paths with spaces require platform-correct quoting in generated command strings.
-
-Validate `/hooks`, capture a sanitized event fixture, and exercise a controlled technical blocker. Verify that pending approval sends no data and duplicates enqueue once. The hook persists the job and returns promptly. The runner works independently; the active or resumed Claude session explicitly retrieves the result rather than being promised automatic resumption.
+For research escalation, tell agents to submit a [handoff](contracts.md) only for a known task and scope. State the blocker accurately; never relabel a permission/safety boundary as technical uncertainty. Do not expose approval tools to agents.
 
 ## Review, recovery, and uninstall
 
 For coding jobs, inspect `changes.patch`, altered tests, base SHA, verification command/exit status, and unresolved issues. Integrate separately through the owner's normal merge/cherry-pick workflow. If the destination advanced, handle conflicts explicitly and rerun relevant verification. Preserve worktrees until review, then use bridge cleanup; never remove arbitrary paths or force-reset the user's checkout.
 
-When the provider fails, show a sanitized retryable error and usage uncertainty. When the runner stops, preserve queued jobs and reconcile interrupted execution before retrying. Disable only bridge hook entries, unregister only this MCP server, and stop/remove only its runner service to uninstall. Keep or explicitly delete private state/artifacts according to the owner's choice. No global settings or repository deletion is implied.
+When the provider fails, show a sanitized retryable error and usage uncertainty. When the runner stops, preserve queued jobs and reconcile interrupted execution before retrying. Unregister only this MCP server, and stop/remove only its runner service to uninstall. Keep or explicitly delete private state/artifacts according to the owner's choice. No global settings or repository deletion is implied.
 
 ## Host worker execution
 

@@ -20,10 +20,8 @@ max_concurrent = 1
 max_concurrent_limit = 3
 default_timeout_seconds = 1800
 max_timeout_seconds = 3600
-estimated_cost_limit_usd = 2.0
 
 [worker]
-backend = "host"
 enabled = false
 compatibility_verified = false
 executable = "opencode"
@@ -32,13 +30,6 @@ executable = "opencode"
 model = "deepseek/deepseek-v4-pro"
 # worktree_root = "/absolute/private/path/to/worker-worktrees"
 max_output_bytes = 2000000
-
-[research]
-mode = "manual"
-require_trusted_scope = true
-max_auto_escalations_per_task_revision = 1
-active_tools_enabled = false
-compatibility_verified = false
 
 [storage]
 # Defaults to ~/.local/state/deepseek-bridge; keep outside repositories.
@@ -60,9 +51,3 @@ retention_days = 30
 # commands = [["/absolute/path/to/uv", "sync", "--frozen"]]
 
 # Top-level scope_registry must precede TOML tables; see docs/operations.md.
-# No default prices: unknown cost stays null. Add owner-maintained, versioned prices:
-# [prices.deepseek-flash]
-# version = "owner-verified-YYYY-MM-DD"
-# input_per_million = 0.0
-# output_per_million = 0.0
-# cached_per_million = 0.0

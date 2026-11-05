@@ -10,7 +10,7 @@ Register repository aliases and trusted verification argv in that configuration.
 
 ## Separate runner and services
 
-Run `deepseek-bridge runner` in its own terminal during development. `runner --once` drains one bounded batch and exits. The runner uses an exclusive file lock, transactional SQLite claims, heartbeats/leases, repository/shared-resource scheduling, and a shared provider/worker concurrency limit of one by default (maximum three). MCP and hooks only enqueue jobs. They never spawn detached workers. Consultations remain synchronous and need no runner.
+Run `deepseek-bridge runner` in its own terminal during development. `runner --once` drains one bounded batch and exits. The runner uses an exclusive file lock, transactional SQLite claims, heartbeats, repository/shared-resource scheduling, and a shared provider/worker concurrency limit of one by default (maximum three). MCP only enqueues jobs. It never spawns detached workers. Consultations remain synchronous and need no runner.
 
 After recording compatibility evidence, `deepseek-bridge --config /absolute/private/config.toml service install` installs a user launchd agent on macOS or systemd user service on Linux. `service remove` stops/removes only that service and preserves data. macOS launchd installation and runner heartbeat were verified on the development host; removal and Linux systemd remain untested on real hosts. The private credential file also works for the service; credentials are not written to service files. Use an absolute virtualenv launcher and ensure its configured PATH includes approved toolchains. Service installation cannot fix missing toolchains or credentials automatically.
 
@@ -38,30 +38,22 @@ Add top-level `scope_registry="/absolute/private/scopes.json"` **before** any TO
 {"scopes":{"parser-review":{"repository":"example-project","version":"1","expires":1794000000,"files":["src/parser.py"],"allow_inline":false,"sensitive":false,"passive_activities":["passive_analysis"],"max_output_tokens":4000,"timeout_seconds":120}},"tasks":{"parser-task":{"revision":1,"scope_id":"parser-review","session_id":"actual-session","objective":"Explain parser failure"}}}
 ```
 
-`research --request handoff.json --session-id actual-session` creates a pending proposal. Use the contract in docs/contracts.md. `approvals show ID` displays the exact snapshot, action, scope fingerprint, limits/hash, and expiry. `approvals approve ID --request-hash HASH` requires an interactive owner terminal and typing `approve`. `approvals reject ID --request-hash HASH` rejects. MCP has no approval tool. Revalidation at dispatch rejects changed bytes, model, scope, revision, expiry, or hash. Rejected/deleted tasks keep their escalation tombstones; a new attempt needs an owner-created revision. Active research and permission/safety rerouting remain unsupported even with approval.
+`research --request handoff.json --session-id actual-session` creates a pending proposal. Use the contract in docs/contracts.md. `approvals show ID` displays the exact snapshot, action, scope fingerprint, limits/hash, and expiry. `approvals approve ID --request-hash HASH` requires an interactive owner terminal and typing `approve`. `approvals reject ID --request-hash HASH` rejects. MCP has no approval tool. Revalidation at dispatch rejects changed bytes, model, scope, revision, expiry, or hash. Active research and permission/safety rerouting remain unsupported even with approval.
 
-Automatic research additionally requires installed-version hook evidence and the compatibility settings described above. `.claude/security-research-state.json` is untrusted text: include it explicitly through context only if scope permits. It never grants permission.
+`.claude/security-research-state.json` is untrusted text: include it explicitly through context only if scope permits. It never grants permission.
 
-## Hooks and rollback
+## Rollback
 
-Merge only bridge entries into existing Claude settings; do not replace the file. For a verified installation, the minimal addition is:
-
-```json
-{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"/absolute/path/to/deepseek-bridge hook","timeout":2}]}],"SubagentStop":[{"hooks":[{"type":"command","command":"/absolute/path/to/deepseek-bridge hook","timeout":2}]}]}}
-```
-
-Use platform-correct shell quoting if the absolute launcher path contains spaces. Hooks read at most 250 KB, use `last_assistant_message` only, never open arbitrary transcript paths, and return empty stdout on success. They enqueue no cloud calls themselves. Hook JSON/database failures return a sanitized stderr error; they cannot authorize work. No-marker/API/tool failures do not infer tasks; StopFailure and permission failures are telemetry-only. Optional events require installed-version validation. Do not block Stop to poll; resume Claude and retrieve a result explicitly.
-
-To roll back, remove only matching bridge hook entries, run `claude mcp remove deepseek-bridge`, stop/remove its user runner service, and leave private state intact. Consultations can be disabled by removing the credential from all configured sources. No global Claude authentication setting needs changing.
+To roll back, run `claude mcp remove deepseek-bridge`, stop/remove its user runner service, and leave private state intact. Consultations can be disabled by removing the credential from all configured sources. No global Claude authentication setting needs changing.
 
 ## Retention and budgets
 
-Run `prune` periodically from the owner CLI; retention defaults to 30 days. Consultations/telemetry expire, terminal jobs with safely removable worktrees are deleted, dirty jobs remain for review, and old unreferenced artifact files are cleaned. Minimal escalation identity tombstones remain to prevent replay. Export before deletion when evidence matters. SQLite deletion is logical, not a secure wipe; protect the disk and backups.
+Run `prune` periodically from the owner CLI; retention defaults to 30 days. Consultations expire, terminal jobs with safely removable worktrees are deleted, dirty jobs remain for review, and old unreferenced artifact files are cleaned. Export before deletion when evidence matters. SQLite deletion is logical, not a secure wipe; protect the disk and backups.
 
-Time/output/context/concurrency limits are enforced locally. Worker token limits are observed from completed step events and may overshoot by an in-flight step. Dollar checks use versioned owner prices and conservative estimates when available, and remain unknown otherwise; they are not exact hard caps. Cache read/creation counters and absent test counts stay unknown when unreported. Never retry an interrupted/bill-ambiguous job without reviewing its artifacts and starting an explicit new attempt.
+Time/output/context/concurrency limits are enforced locally. Worker token limits are observed from completed step events and may overshoot by an in-flight step. The bridge records token usage, not dollar cost. Cache read/creation counters and absent test counts stay unknown when unreported. Never retry an interrupted/bill-ambiguous job without reviewing its artifacts and starting an explicit new attempt.
 
 ## Local macOS setup recorded 2026-11-01
 
 `scripts/setup_local.py` installs this checkout's virtualenv launcher, creates private configuration/empty credentials/empty scopes without replacing existing files, and starts the launchd runner. It assumes Homebrew OpenCode 2.2.5 at `/opt/homebrew/bin/opencode`; it does not certify another installed version. The launcher depends on this checkout and `.venv` remaining in place.
 
-On the development host, Claude Code 2.1.309 was installed and subscription sign-in completed, the user-scoped MCP connection passed, existing settings were backed up before merging Stop/SubagentStop entries, and the verified OpenCode pin was enabled. Research stays manual: no owner scopes/tasks or real hook payload were supplied. The credential file is an empty placeholder until the owner fills it locally. No paid DeepSeek calls were made. Coding jobs use committed Git bases; uncommitted implementation files in the original checkout are not copied into a job. The registered test profile uses pytest's `pythonpath=src` so imports come from the job worktree rather than the editable installation.
+On the development host, Claude Code 2.1.309 was installed and subscription sign-in completed, the user-scoped MCP connection passed, and the verified OpenCode pin was enabled. No owner scopes/tasks were supplied for research. The credential file is an empty placeholder until the owner fills it locally. No paid DeepSeek calls were made. Coding jobs use committed Git bases; uncommitted implementation files in the original checkout are not copied into a job. The registered test profile uses pytest's `pythonpath=src` so imports come from the job worktree rather than the editable installation.

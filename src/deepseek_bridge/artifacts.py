@@ -59,11 +59,11 @@ class Artifacts:
         finally:
             temporary.unlink(missing_ok=True)
 
-    def list(self, job_id: str, offset: int = 0, limit: int = 50) -> list[dict[str, Any]]:
+    def list(self, job_id: str, limit: int = 50) -> list[dict[str, Any]]:
         with self.db.connect() as db:
             rows = db.execute(
-                "SELECT * FROM artifacts WHERE job_id=? ORDER BY name LIMIT ? OFFSET ?",
-                (job_id, min(max(limit, 1), 100), max(offset, 0)),
+                "SELECT * FROM artifacts WHERE job_id=? ORDER BY name LIMIT ?",
+                (job_id, min(max(limit, 1), 100)),
             ).fetchall()
         return [dict(row) for row in rows]
 

@@ -1,5 +1,7 @@
 # 0.1.0 implementation baseline
 
+Note: hook-based automatic research, price estimates, leases, and the tables behind them were later removed as unused; see [operations](operations.md) for current behavior.
+
 This release implements the local workflow and validates it offline. It does not claim completion of the plan's live release gates.
 
 Implemented: typed settings/contracts and generated schemas; CLI and seven FastMCP stdio tools; direct DeepSeek Anthropic SDK adapter; selected-context/path/symlink/secret/byte checks; structured reviews and continuation blocks; private retained consultation history; nullable token/cache usage and versioned estimates; transactional SQLite v1 migration, durable jobs/events/approvals/artifacts; provider reservations, concurrency/resource scheduling, idempotency, deadlines/cancellation, runner singleton/heartbeat/leases and interruption recovery; atomic checksummed artifacts/export/prune/delete; gated host OpenCode execution and independent verification in generated worktrees; binary/new/deleted patches; trusted task/scope policy, interactive owner approvals and bounded local hooks; doctor, explicit user service installation commands, CI and recovery documentation.

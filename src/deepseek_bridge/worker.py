@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any
 
 from . import opencode, worktrees
-from .accounting import preflight
 from .artifacts import Artifacts
 from .credentials import get_api_key
 from .database import Database
@@ -104,12 +103,6 @@ class CodingWorker:
                     "instructions": "Edit this worktree only. Never push, merge or deploy. "
                     "Trusted verification runs separately after you finish.",
                 }
-            )
-            preflight(
-                self.settings,
-                self.settings.worker.model.split("/", 1)[-1],
-                self.settings.consultant.max_input_bytes,
-                request["limits"]["max_output_tokens"],
             )
             result = execute(
                 [

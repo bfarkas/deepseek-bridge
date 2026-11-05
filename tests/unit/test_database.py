@@ -86,10 +86,10 @@ def test_deadlines_and_shared_resource_claims(settings: Settings) -> None:
 def test_transaction_rollback_and_schema_recovery(settings: Settings) -> None:
     db = Database(settings)
     with pytest.raises(RuntimeError), db.transaction() as connection:
-        connection.execute("INSERT INTO telemetry(event,created) VALUES('rolled back',0)")
+        connection.execute("INSERT INTO consultations VALUES('rolled back','[]',0)")
         raise RuntimeError("fixture")
     with db.connect() as connection:
-        assert connection.execute("SELECT count(*) FROM telemetry").fetchone()[0] == 0
+        assert connection.execute("SELECT count(*) FROM consultations").fetchone()[0] == 0
         connection.execute("PRAGMA user_version=99")
     with pytest.raises(BridgeError):
         Database(settings)
@@ -122,7 +122,7 @@ def test_events_paginate_and_history_retention(settings: Settings) -> None:
     job = service.db.enqueue("research", {}, 100)
     first = service.status(job["id"])
     assert service.status(job["id"], first["cursor"])["events"] == []
-    service.db.save_history("fixture", [], {})
+    service.db.save_history("fixture", [])
     with service.db.transaction() as db:
         db.execute("UPDATE consultations SET updated=?", (time.time() - 31 * 86400,))
     with pytest.raises(BridgeError):
@@ -164,6 +164,26 @@ def test_initial_migration_failure_rolls_back(
         )
     monkeypatch.setattr(module, "SCHEMA", schema)
     assert Database(settings).list_jobs() == []
+
+
+def test_v1_database_upgrades_in_place(settings: Settings) -> None:
+    import deepseek_bridge.database as module
+
+    path = settings.storage.state_dir / settings.storage.database_filename
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with sqlite3.connect(path) as connection:
+        connection.executescript(module.SCHEMA)
+        connection.execute("PRAGMA user_version=1")
+        connection.execute("INSERT INTO consultations VALUES('kept','[]',0)")
+    db = Database(settings)
+    with db.connect() as connection:
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 2
+        tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master")}
+        columns = {row[1] for row in connection.execute("PRAGMA table_info(jobs)")}
+        kept = connection.execute("SELECT count(*) FROM consultations").fetchone()[0]
+    assert not tables & {"api_usage", "escalations", "telemetry"}
+    assert "lease" not in columns
+    assert kept == 1
 
 
 def test_simultaneous_initialization(settings: Settings) -> None:
