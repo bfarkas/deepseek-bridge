@@ -144,6 +144,14 @@ def test_process_limits(tmp_path: Path, mode: str) -> None:
     assert not owns(result["process"])
 
 
+def test_background_child_does_not_look_timed_out(tmp_path: Path) -> None:
+    result = run(["/bin/sh", "-c", "sleep 30 & echo started"], tmp_path, environment(), 5)
+    assert result["reason"] is None
+    assert result["exit_code"] == 0
+    assert result["output"] == b"started\n"
+    assert result["ended"] - result["started"] < 4
+
+
 def test_pid_reuse_guard(tmp_path: Path) -> None:
     proc = subprocess.Popen(
         [sys.executable, "-c", "import time;time.sleep(10)"], start_new_session=True

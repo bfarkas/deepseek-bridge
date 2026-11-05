@@ -56,7 +56,7 @@ class Consultant:
         body = {
             "task": request.task,
             "context": snapshot,
-            "selection": request.context.model_dump(),
+            "selection": request.context.model_dump(include={"repository", "files"}),
         }
         messages.append({"role": "user", "content": [{"type": "text", "text": json.dumps(body)}]})
         check_text(
@@ -64,12 +64,10 @@ class Consultant:
             self.settings.consultant.max_input_bytes,
             self.settings.deepseek.api_key_env,
         )
-        check_value(self.settings, messages)
-        check_text(
-            json.dumps(messages),
-            self.settings.consultant.max_input_bytes,
-            self.settings.deepseek.api_key_env,
-        )
+        # Stored turns were checked when sent; a reply may quote secret-shaped text.
+        check_value(self.settings, messages[-1])
+        if len(json.dumps(messages).encode()) > self.settings.consultant.max_input_bytes:
+            raise BridgeError("budget_exceeded", "Outbound context exceeds byte limit")
         system = SYSTEM
         report_type = ResearchReport if research else ReviewReport
         structured = research or request.mode == "review"

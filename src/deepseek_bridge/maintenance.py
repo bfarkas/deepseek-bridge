@@ -14,11 +14,11 @@ def delete_job(service: Service, job_id: str) -> None:
     job = service.db.get(job_id)
     if job["state"] not in TERMINAL:
         raise BridgeError("permission_boundary", "Cancel/finish job before deleting artifacts")
+    directory = service.artifacts.directory(job_id)
     if job["worktree"]:
         repo = service.settings.repository(job["request"]["repository"])
         root = service.settings.worker.worktree_root or service.db.path.parent / "worktrees"
-        cleanup(repo.path, root, job_id)
-    directory = service.artifacts.directory(job_id)
+        cleanup(repo.path, root, job_id, (directory / "changes.patch").exists())
     # Only this validated UUID directory under the private artifact root is removable.
     shutil.rmtree(directory)
     with service.db.transaction() as db:

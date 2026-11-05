@@ -48,12 +48,19 @@ def test_symlink_directory_and_fifo(settings: Settings, tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(
     "text",
-    ["api_key=abcdefgh12345678", "\0binary", "sk-" + "a" * 24, "-----BEGIN RSA PRIVATE KEY-----"],
+    ['api_key="abcdefgh12345678"', "\0binary", "sk-" + "a" * 24, "-----BEGIN RSA PRIVATE KEY-----"],
 )
 def test_inline_secrets(settings: Settings, text: str) -> None:
     for context in [Context(text=text), Context(diff=text)]:
         with pytest.raises(BridgeError):
             collect(settings, context)
+
+
+@pytest.mark.parametrize(
+    "text", ["Client(api_key=config.api_key)", "password=self.password", "api_key: request.api_key"]
+)
+def test_ordinary_code_is_not_a_secret(settings: Settings, text: str) -> None:
+    collect(settings, Context(text=text))
 
 
 def test_inline_diff_path(settings: Settings) -> None:
@@ -100,6 +107,34 @@ def test_continuation_preserves_blocks_and_revalidates(settings: Settings) -> No
     with pytest.raises(BridgeError):
         service.ask(Ask(task="Again", consultation_id=cid))
     assert len(fake.calls) == 2
+
+
+def test_secret_shaped_reply_does_not_block_continuation(settings: Settings) -> None:
+    fake = FakeProvider(text='Set password = "hunter2222" here')
+    first = Service(settings, fake).ask(Ask(task="Explain"))
+    Service(settings, fake).ask(
+        Ask(task="Continue", consultation_id=first["data"]["consultation_id"])
+    )
+    assert len(fake.calls) == 2
+
+
+def test_continuation_history_stays_within_byte_limit(settings: Settings) -> None:
+    fake = FakeProvider(text="x" * 1000)
+    first = Service(settings, fake).ask(Ask(task="Explain"))
+    settings.consultant.max_input_bytes = 500
+    with pytest.raises(BridgeError) as error:
+        Service(settings, fake).ask(
+            Ask(task="Continue", consultation_id=first["data"]["consultation_id"])
+        )
+    assert error.value.code == "budget_exceeded"
+
+
+def test_inline_context_sent_once(settings: Settings, fake: FakeProvider) -> None:
+    Service(settings, fake).ask(
+        Ask(task="Explain", context=Context(text="MARKER", diff="DIFFMARK"))
+    )
+    sent = fake.calls[0]["messages"][-1]["content"][0]["text"]
+    assert sent.count("MARKER") == 1 and sent.count("DIFFMARK") == 1
 
 
 def test_malformed_review_and_unknown_usage(settings: Settings, fake: FakeProvider) -> None:

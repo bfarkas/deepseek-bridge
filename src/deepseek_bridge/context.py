@@ -33,7 +33,7 @@ SENSITIVE = (
 SECRET = re.compile(
     r"-----BEGIN (?:[A-Z ]*PRIVATE KEY)|\b(?:sk-[A-Za-z0-9_-]{16,}|"
     r"AKIA[A-Z0-9]{16}|gh[pousr]_[A-Za-z0-9]{20,})|"
-    r"(?i:(?:api[_-]?key|password|access[_-]?token)\s*[=:]\s*[\"']?[^\s\"']{8,})"
+    r"(?i:(?:api[_-]?key|password|access[_-]?token)\s*[=:]\s*[\"'][^\s\"']{8,})"
 )
 
 

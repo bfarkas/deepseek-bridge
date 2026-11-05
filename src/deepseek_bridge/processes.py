@@ -85,6 +85,7 @@ def run(
     ident = identity(proc, cwd)
     output = bytearray()
     reason = None
+    exited = None
     try:
         record(ident)
         with selectors.DefaultSelector() as selector:
@@ -110,11 +111,11 @@ def run(
                     reason = "output_limit"
                     del output[max_bytes:]
                     break
-                if (
-                    psutil.Process(proc.pid).status() == psutil.STATUS_ZOMBIE
-                    and not selector.get_map()
-                ):
-                    break
+                if psutil.Process(proc.pid).status() == psutil.STATUS_ZOMBIE:
+                    exited = exited or time.time()
+                    # A background child can hold the pipe open long after the command is done.
+                    if not selector.get_map() or time.time() - exited > 1:
+                        break
         if reason:
             stop_group(ident)
         # Terminate any remaining members of the verified, just-created process group.

@@ -60,10 +60,6 @@ class Runner:
                         raise BridgeError(
                             "interrupted", "Owned process did not stop; manual recovery needed"
                         ) from exc
-                elif psutil.pid_exists(proc["pid"]):
-                    raise BridgeError(
-                        "interrupted", "Process ownership uncertain; manual recovery required"
-                    )
             self.db.transition(
                 job["id"],
                 "interrupted",

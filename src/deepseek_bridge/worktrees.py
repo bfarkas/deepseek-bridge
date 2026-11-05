@@ -88,7 +88,7 @@ def patch(worktree: Path, sha: str, private: Path) -> tuple[bytes, list[str]]:
         index.unlink(missing_ok=True)
 
 
-def cleanup(repo: Path, root: Path, job_id: str) -> None:
+def cleanup(repo: Path, root: Path, job_id: str, patch_saved: bool = False) -> None:
     import re
 
     if not re.fullmatch(r"[a-f0-9]{32}", job_id):
@@ -104,6 +104,6 @@ def cleanup(repo: Path, root: Path, job_id: str) -> None:
         raise BridgeError("permission_boundary", "Worktree ownership is not established")
     if target.is_symlink():
         raise BridgeError("permission_boundary", "Refusing symlink cleanup")
-    # No --force: reviewed dirty worktrees must be explicitly archived/committed first.
-    git(repo, "worktree", "remove", str(target))
-    git(repo, "branch", "-d", "deepseek-bridge/" + job_id)
+    # Workers never commit, so forcing is needed; without a saved patch changes must survive.
+    git(repo, "worktree", "remove", *(["--force"] if patch_saved else []), str(target))
+    git(repo, "branch", "-D" if patch_saved else "-d", "deepseek-bridge/" + job_id)

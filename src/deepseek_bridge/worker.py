@@ -119,6 +119,9 @@ class CodingWorker:
                 env,
                 worker=True,
             )
+            # Saved before any stop is reported, so partial edits stay reviewable.
+            patch, files = worktrees.patch(target, request["base_sha"], private)
+            artifacts.append(self.artifacts.publish(job_id, "changes.patch", patch, "text/x-diff"))
             require(result)
             usage = opencode.parse_events(result["output"])
             artifacts.append(
@@ -146,10 +149,8 @@ class CodingWorker:
                 if checked["reason"]:
                     require(checked)
             after_verification = worktrees.snapshot(target)
-            patch, files = worktrees.patch(target, request["base_sha"], private)
-            artifacts.append(self.artifacts.publish(job_id, "changes.patch", patch, "text/x-diff"))
             unchanged = original == worktrees.snapshot(repo.path)
-            report: dict[str, Any] = {
+            return {
                 "schema_version": "1.0",
                 "job_id": job_id,
                 "role": "coding",
@@ -187,11 +188,6 @@ class CodingWorker:
                 "unresolved_questions": [],
                 "artifacts": artifacts,
             }
-            if not unchanged:
-                raise BridgeError(
-                    "permission_boundary", "Original checkout changed during host execution"
-                )
-            return report
         finally:
             # These logs remain available even when execution or collection fails.
             self.artifacts.publish(

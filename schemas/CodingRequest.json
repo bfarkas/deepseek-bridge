@@ -11,8 +11,8 @@
           "type": "integer"
         },
         "max_output_tokens": {
-          "default": 8000,
-          "maximum": 8000,
+          "default": 100000,
+          "maximum": 1000000,
           "minimum": 1,
           "title": "Max Output Tokens",
           "type": "integer"

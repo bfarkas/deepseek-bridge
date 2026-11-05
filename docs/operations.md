@@ -14,7 +14,7 @@ Run `deepseek-bridge runner` in its own terminal during development. `runner --o
 
 After recording compatibility evidence, `deepseek-bridge --config /absolute/private/config.toml service install` installs a user launchd agent on macOS or systemd user service on Linux. `service remove` stops/removes only that service and preserves data. macOS launchd installation and runner heartbeat were verified on the development host; removal and Linux systemd remain untested on real hosts. The private credential file also works for the service; credentials are not written to service files. Use an absolute virtualenv launcher and ensure its configured PATH includes approved toolchains. Service installation cannot fix missing toolchains or credentials automatically.
 
-SIGINT/SIGTERM persists cancellation for running jobs and waits for bounded execution to stop. Provider cancellation waits for an in-flight request's configured timeout and may still incur billing. Crash restart stops processes only when PID/start time/UID/group ownership matches, then marks unfinished jobs interrupted. It never reexecutes them automatically. Ambiguous process ownership stops runner startup for manual inspection; never kill a PID merely because its number was recorded. A crash between process creation and ownership persistence remains a small recovery gap; inspect host processes before retrying uncertain work.
+SIGINT/SIGTERM persists cancellation for running jobs and waits for bounded execution to stop. Provider cancellation waits for an in-flight request's configured timeout and may still incur billing. Crash restart stops processes only when PID/start time/UID/group ownership matches, then marks unfinished jobs interrupted. It never reexecutes them automatically. A recorded PID that fails those checks is treated as an unrelated process and left alone, so startup continues; never kill a PID merely because its number was recorded. A crash between process creation and ownership persistence remains a small recovery gap; inspect host processes before retrying uncertain work.
 
 ## Coding workflow
 
@@ -23,12 +23,12 @@ Leave `[worker].enabled=false` until docs/compatibility.md gates pass. Set `expe
 Example request file (pass with `jobs start --request request.json`; MCP uses the same object under `request`):
 
 ```json
-{"schema_version":"1.0","repository":"example-project","task":"Fix the parser","acceptance_criteria":["Regression test passes"],"verification_profile":"approved-tests","base_ref":"HEAD","client_request_id":"parser-fix-1","limits":{"timeout_seconds":1800,"max_output_tokens":8000}}
+{"schema_version":"1.0","repository":"example-project","task":"Fix the parser","acceptance_criteria":["Regression test passes"],"verification_profile":"approved-tests","base_ref":"HEAD","client_request_id":"parser-fix-1","limits":{"timeout_seconds":1800,"max_output_tokens":100000}}
 ```
 
 Use `jobs list`, `jobs status ID`, `jobs result ID`, and `jobs cancel ID`. `jobs retry ID` explicitly creates a new coding attempt linked to the terminal original and preserves its immutable base SHA; research requires a new owner-created task revision. Review the independently collected binary-capable patch, base SHA, changed tests, verification argv/exit/log/workspace hashes, actual model if reported, and nullable usage. Pipeline completion differs from verification success. Verification commands may execute worker-modified code/tests, so passing is evidence to review, not a security guarantee. `jobs review ID accepted|rejected` records the owner's outcome. Integrate patches separately and rerun tests after integration. There is no automatic commit/merge/push/deploy.
 
-`jobs export ID /new/private/destination` verifies artifact checksums before export. `jobs delete ID` only accepts terminal jobs and bridge-owned worktrees that Git can remove without force. Dirty worktrees are retained: review/export, then archive or commit changes manually in that bridge worktree before deletion. Cleanup never force-resets the original checkout. If a bridge branch has commits, integrate/archive them before `branch -d` can succeed.
+`jobs export ID /new/private/destination` verifies artifact checksums before export. `jobs delete ID` only accepts terminal jobs and bridge-owned worktrees. Once `changes.patch` is saved, delete removes the worktree and branch even with changes, because the patch holds them; export first if you need it afterwards. Without a saved patch (for example after a runner crash), a dirty worktree is retained: archive or commit its changes manually before deletion. Cleanup never force-resets the original checkout.
 
 ## Trusted research and approval
 
@@ -48,7 +48,7 @@ To roll back, run `claude mcp remove deepseek-bridge`, stop/remove its user runn
 
 ## Retention and budgets
 
-Run `prune` periodically from the owner CLI; retention defaults to 30 days. Consultations expire, terminal jobs with safely removable worktrees are deleted, dirty jobs remain for review, and old unreferenced artifact files are cleaned. Export before deletion when evidence matters. SQLite deletion is logical, not a secure wipe; protect the disk and backups.
+Run `prune` periodically from the owner CLI; retention defaults to 30 days. Consultations expire, terminal jobs are deleted along with their saved patches, dirty jobs without a saved patch remain for review, and old unreferenced artifact files are cleaned. Export before deletion when evidence matters. SQLite deletion is logical, not a secure wipe; protect the disk and backups.
 
 Time/output/context/concurrency limits are enforced locally. Worker token limits are observed from completed step events and may overshoot by an in-flight step. The bridge records token usage, not dollar cost. Cache read/creation counters and absent test counts stay unknown when unreported. Never retry an interrupted/bill-ambiguous job without reviewing its artifacts and starting an explicit new attempt.
 

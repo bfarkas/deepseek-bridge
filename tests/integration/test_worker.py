@@ -1,5 +1,6 @@
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -7,7 +8,9 @@ import pytest
 
 from deepseek_bridge.contracts import CodingRequest
 from deepseek_bridge.errors import BridgeError
+from deepseek_bridge.maintenance import delete_job
 from deepseek_bridge.opencode import parse_events, validate_effective
+from deepseek_bridge.processes import identity
 from deepseek_bridge.runner import Runner
 from deepseek_bridge.service import Service
 from deepseek_bridge.settings import Profile, Settings
@@ -124,6 +127,102 @@ def test_failed_verification_still_delivers_patch(
     assert result["report"]["verification"]["status"] == "failed"
     assert result["report"]["verification"]["runs"][0]["exit_code"] == 7
     assert any(a["name"] == "changes.patch" for a in result["artifacts"])
+
+
+def fixture_job(service: Service, **limits: int) -> str:
+    request = CodingRequest(
+        repository="fixture",
+        task="Fixture",
+        acceptance_criteria=["test"],
+        verification_profile="tests",
+        limits=limits,
+    )
+    return service.start_job(request)["job_id"]
+
+
+def test_delete_job_removes_worktree_once_patch_is_saved(
+    worker_settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "fixture-worker-key")
+    service = Service(worker_settings)
+    job_id = fixture_job(service)
+    Runner(service).run(once=True)
+    target = Path(service.db.get(job_id)["worktree"])
+    assert target.exists()
+    delete_job(service, job_id)
+    repo = worker_settings.repository("fixture").path
+    assert not target.exists()
+    assert b"deepseek-bridge/" not in git(repo, "branch", "--list")
+    with pytest.raises(BridgeError):
+        service.db.get(job_id)
+
+
+def test_delete_job_keeps_changes_without_saved_patch(
+    worker_settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "fixture-worker-key")
+    service = Service(worker_settings)
+    job_id = fixture_job(service)
+    Runner(service).run(once=True)
+    (service.artifacts.directory(job_id) / "changes.patch").unlink()
+    with pytest.raises(BridgeError):
+        delete_job(service, job_id)
+    assert (Path(service.db.get(job_id)["worktree"]) / "test_new.py").exists()
+
+
+def test_checkout_saved_during_job_is_reported_not_failed(
+    worker_settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "fixture-worker-key")
+    code = worker_settings.repository("fixture").path / "code.py"
+    worker_settings.profiles["tests"] = Profile(
+        commands=[[sys.executable, "-c", f"open({str(code)!r}, 'w').write('saved\\n')"]]
+    )
+    service = Service(worker_settings)
+    job_id = fixture_job(service)
+    Runner(service).run(once=True)
+    result = service.result(job_id)
+    assert result["state"] == "completed", result
+    assert result["report"]["original_checkout_unchanged"] is False
+
+
+def test_token_limit_keeps_partial_patch(
+    worker_settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "fixture-worker-key")
+    service = Service(worker_settings)
+    job_id = fixture_job(service, max_output_tokens=1)
+    Runner(service).run(once=True)
+    result = service.result(job_id)
+    assert result["state"] == "failed", result
+    assert result["error"]["code"] == "budget_exceeded"
+    assert any(a["name"] == "changes.patch" for a in result["artifacts"])
+
+
+def test_job_token_limit_covers_a_whole_session(worker_settings: Settings) -> None:
+    job_id = fixture_job(Service(worker_settings), max_output_tokens=500000)
+    assert job_id
+
+
+def test_restart_marks_job_interrupted_when_pid_was_reused(
+    worker_settings: Settings, tmp_path: Path
+) -> None:
+    service = Service(worker_settings)
+    job_id = fixture_job(service)
+    # After a reboot the recorded PID can belong to an unrelated process.
+    process = subprocess.Popen(["sleep", "20"], start_new_session=True)
+    try:
+        record = identity(process, tmp_path)
+        record["created"] -= 100
+        with service.db.transaction() as db:
+            db.execute("UPDATE jobs SET state='running', owner='old' WHERE id=?", (job_id,))
+        service.db.execution(job_id, "old", process=record)
+        Runner(service).reconcile()
+        assert service.db.get(job_id)["state"] == "interrupted"
+        assert process.poll() is None
+    finally:
+        process.kill()
+        process.wait()
 
 
 def test_config_gate_and_unapproved_extensions(

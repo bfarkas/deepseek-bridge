@@ -63,7 +63,8 @@ class Usage(StrictModel):
 
 class Limits(StrictModel):
     timeout_seconds: int = Field(default=1800, ge=1, le=3600)
-    max_output_tokens: int = Field(default=8000, ge=1, le=8000)
+    # Total across every step of a coding session, not one reply.
+    max_output_tokens: int = Field(default=100000, ge=1, le=1000000)
 
 
 class CodingRequest(Versioned):
